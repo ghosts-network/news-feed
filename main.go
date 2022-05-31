@@ -6,13 +6,14 @@ import (
 	"fmt"
 	"github.com/Azure/azure-sdk-for-go/sdk/messaging/azservicebus"
 	"log"
+	"os"
 	"time"
 )
 
 var client *azservicebus.Client
 
 func main() {
-	connectionString := "XXX"
+	connectionString := os.Getenv("SERVICEBUS_CONNECTION")
 	client, _ = azservicebus.NewClientFromConnectionString(connectionString, nil)
 	ctx, cancel := context.WithTimeout(context.TODO(), 60*time.Second)
 
