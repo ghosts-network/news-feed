@@ -1,0 +1,15 @@
+*.cov
+.cover
+target
+/logs/
+/target/
+/var/
+/web/
+debug
+debug.test
+.vscode
+.idea/
+*.prof
+*.test
+.DS_Store
+/bin/
