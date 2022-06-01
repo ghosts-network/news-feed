@@ -13,6 +13,8 @@ import (
 	"time"
 )
 
+const subscriptionName string = "ghostnetwork.newsfeed"
+
 var storage NewsStorage
 var eventbus *EventBus
 
@@ -37,36 +39,95 @@ func main() {
 
 	ctx, cancel := context.WithTimeout(context.TODO(), 60*time.Second)
 
-	err = eventbus.ListenOne(ctx, "ghostnetwork.content.publications.created", "go-tests", func(message *azservicebus.ReceivedMessage) error {
+	err = eventbus.ListenOne(ctx, "ghostnetwork.content.publications.created", subscriptionName, func(message *azservicebus.ReceivedMessage) error {
 		var model Publication
 		err := json.Unmarshal(message.Body, &model)
 		if err != nil {
-			log.Printf("%v\n", err.Error())
 			return err
 		}
 
-		storage.Add(model)
 		return nil
 	})
-
 	if err != nil {
 		log.Fatalf("Error trying to listen ghostnetwork.content.publications.created: %v", err.Error())
 	}
 
-	err = eventbus.ListenOne(ctx, "ghostnetwork.content.publications.deleted", "tests", func(message *azservicebus.ReceivedMessage) error {
+	err = eventbus.ListenOne(ctx, "ghostnetwork.content.publications.deleted", subscriptionName, func(message *azservicebus.ReceivedMessage) error {
 		var model Publication
 		err := json.Unmarshal(message.Body, &model)
 		if err != nil {
-			log.Printf("%v\n", err.Error())
 			return err
 		}
 
-		storage.Add(model)
 		return nil
 	})
-
 	if err != nil {
-		log.Fatalf("Error trying to listen ghostnetwork.content.publications.created: %v", err.Error())
+		log.Fatalf("Error trying to listen ghostnetwork.content.publications.deleted: %v", err.Error())
+	}
+
+	err = eventbus.ListenOne(ctx, "ghostnetwork.profiles.friends.requestsent", subscriptionName, func(message *azservicebus.ReceivedMessage) error {
+		var model RequestSent
+		err := json.Unmarshal(message.Body, &model)
+		if err != nil {
+			return err
+		}
+
+		return nil
+	})
+	if err != nil {
+		log.Fatalf("Error trying to listen ghostnetwork.profiles.friends.requestsent: %v", err.Error())
+	}
+
+	err = eventbus.ListenOne(ctx, "ghostnetwork.profiles.friends.requestcancelled", subscriptionName, func(message *azservicebus.ReceivedMessage) error {
+		var model RequestCancelled
+		err := json.Unmarshal(message.Body, &model)
+		if err != nil {
+			return err
+		}
+
+		return nil
+	})
+	if err != nil {
+		log.Fatalf("Error trying to listen ghostnetwork.profiles.friends.requestcancelled: %v", err.Error())
+	}
+
+	err = eventbus.ListenOne(ctx, "ghostnetwork.profiles.friends.requestapproved", subscriptionName, func(message *azservicebus.ReceivedMessage) error {
+		var model RequestApproved
+		err := json.Unmarshal(message.Body, &model)
+		if err != nil {
+			return err
+		}
+
+		return nil
+	})
+	if err != nil {
+		log.Fatalf("Error trying to listen ghostnetwork.profiles.friends.requestapproved: %v", err.Error())
+	}
+
+	err = eventbus.ListenOne(ctx, "ghostnetwork.profiles.friends.requestdeclined", subscriptionName, func(message *azservicebus.ReceivedMessage) error {
+		var model RequestDeclined
+		err := json.Unmarshal(message.Body, &model)
+		if err != nil {
+			return err
+		}
+
+		return nil
+	})
+	if err != nil {
+		log.Fatalf("Error trying to listen ghostnetwork.profiles.friends.requestdeclined: %v", err.Error())
+	}
+
+	err = eventbus.ListenOne(ctx, "ghostnetwork.profiles.friends.deleted", subscriptionName, func(message *azservicebus.ReceivedMessage) error {
+		var model Deleted
+		err := json.Unmarshal(message.Body, &model)
+		if err != nil {
+			return err
+		}
+
+		return nil
+	})
+	if err != nil {
+		log.Fatalf("Error trying to listen ghostnetwork.profiles.friends.deleted: %v", err.Error())
 	}
 
 	go runServer()
@@ -91,18 +152,6 @@ func runServer() {
 	log.Fatal(http.ListenAndServe(":10000", nil))
 }
 
-type Publication struct {
-	Id      string
-	Content string
-	Author  *PublicationAuthor
-}
-
-type PublicationAuthor struct {
-	Id        string
-	FullName  string
-	AvatarUrl string
-}
-
 type NewsStorage interface {
 	Add(publication Publication)
 	Remove(publication Publication)
@@ -125,4 +174,41 @@ func (storage *RedisNewsStorage) Find() []Publication {
 
 func NewRedisNewsStorage(rdb *redis.Client) *RedisNewsStorage {
 	return &RedisNewsStorage{rdb: rdb}
+}
+
+type Publication struct {
+	Id      string
+	Content string
+	Author  *PublicationAuthor
+}
+
+type PublicationAuthor struct {
+	Id        string
+	FullName  string
+	AvatarUrl string
+}
+
+type RequestSent struct {
+	FromUser string
+	ToUser   string
+}
+
+type RequestCancelled struct {
+	FromUser string
+	ToUser   string
+}
+
+type RequestApproved struct {
+	User      string
+	Requester string
+}
+
+type RequestDeclined struct {
+	User      string
+	Requester string
+}
+
+type Deleted struct {
+	User   string
+	Friend string
 }
