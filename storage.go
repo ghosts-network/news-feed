@@ -8,9 +8,9 @@ import (
 )
 
 type NewsStorage interface {
-	AddPublication(publication *Publication)
-	// UpdatePublication(publication Publication)
-	RemovePublication(publication *Publication)
+	AddPublication(publication *Publication) error
+	UpdatePublication(publication *Publication) error
+	RemovePublication(publication *Publication) error
 
 	//GetUserSources()
 	//AddUserSource()
@@ -23,12 +23,19 @@ type RedisNewsStorage struct {
 	rdb *redis.Client
 }
 
-func (storage *RedisNewsStorage) AddPublication(publication *Publication) {
-	storage.rdb.HSetNX(context.Background(), "user:1:news", publication.Id, publication.Content).Result()
+func (storage *RedisNewsStorage) AddPublication(publication *Publication) (err error) {
+	_, err = storage.rdb.HSet(context.Background(), "user:1:news", publication.Id, publication.Content).Result()
+	return
 }
 
-func (storage *RedisNewsStorage) RemovePublication(publication *Publication) {
-	storage.rdb.HDel(context.Background(), "user:1:news", publication.Id).Result()
+func (storage *RedisNewsStorage) UpdatePublication(publication *Publication) (err error) {
+	_, err = storage.rdb.HSet(context.Background(), "user:1:news", publication.Id, publication.Content).Result()
+	return
+}
+
+func (storage *RedisNewsStorage) RemovePublication(publication *Publication) (err error) {
+	_, err = storage.rdb.HDel(context.Background(), "user:1:news", publication.Id).Result()
+	return
 }
 
 func (storage *RedisNewsStorage) FindNews(user string, cursor string) []Publication {

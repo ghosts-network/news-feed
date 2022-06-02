@@ -50,7 +50,7 @@ func (eb EventBus) ListenOne(ctx context.Context, topicName string, subscription
 				eb.logger.Printf("Message %v from %v processing", message.MessageID, topicName)
 				if err := handler(message); err != nil {
 					_ = receiver.AbandonMessage(ctx, message, nil)
-					eb.logger.Printf("Message %v from %v abandoned", message.MessageID, topicName)
+					eb.logger.Printf("Message %v from %v abandoned with error: %v", message.MessageID, topicName, err.Error())
 				} else {
 					_ = receiver.CompleteMessage(ctx, message, nil)
 					eb.logger.Printf("Message %v from %v completed", message.MessageID, topicName)

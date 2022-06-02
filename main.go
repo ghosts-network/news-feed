@@ -37,7 +37,7 @@ func main() {
 	})
 
 	rdb := redis.NewClient(&redis.Options{
-		Addr:     "10.11.34.110:6379",
+		Addr:     os.Getenv("REDIS_ADDRESS"),
 		Password: "", // no password set
 		DB:       0,  // use default DB
 	})
@@ -59,12 +59,33 @@ func runBackgroundSubscriptions(ctx context.Context) {
 			return err
 		}
 
-		storage.AddPublication(&model)
+		err = storage.AddPublication(&model)
+		if err != nil {
+			return err
+		}
 
 		return nil
 	})
 	if err != nil {
 		log.Fatalf("Error trying to listen ghostnetwork.content.publications.created: %v", err.Error())
+	}
+
+	err = eventbus.ListenOne(ctx, "ghostnetwork.content.publications.updated", subscriptionName, func(message *azservicebus.ReceivedMessage) error {
+		var model Publication
+		err := json.Unmarshal(message.Body, &model)
+		if err != nil {
+			return err
+		}
+
+		err = storage.UpdatePublication(&model)
+		if err != nil {
+			return err
+		}
+
+		return nil
+	})
+	if err != nil {
+		log.Fatalf("Error trying to listen ghostnetwork.content.publications.updated: %v", err.Error())
 	}
 
 	err = eventbus.ListenOne(ctx, "ghostnetwork.content.publications.deleted", subscriptionName, func(message *azservicebus.ReceivedMessage) error {
@@ -74,7 +95,10 @@ func runBackgroundSubscriptions(ctx context.Context) {
 			return err
 		}
 
-		storage.RemovePublication(&model)
+		err = storage.RemovePublication(&model)
+		if err != nil {
+			return err
+		}
 
 		return nil
 	})
