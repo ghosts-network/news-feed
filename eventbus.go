@@ -80,5 +80,7 @@ func (eb EventBus) ensureSubscriptionExists(topicName string, subscriptionName s
 	if err != nil {
 		return err
 	}
+
+	eb.logger.Printf("Subscription %v on topic %+v created or updated\n", subscriptionName, topicName)
 	return nil
 }
