@@ -7,6 +7,7 @@ import (
 	"github.com/Azure/azure-sdk-for-go/sdk/azidentity"
 	"github.com/Azure/azure-sdk-for-go/sdk/messaging/azservicebus"
 	"github.com/go-redis/redis/v8"
+	"github.com/gorilla/mux"
 	"log"
 	"net/http"
 	"os"
@@ -35,16 +36,30 @@ func main() {
 		},
 	})
 
-	storage = NewRedisNewsStorage(nil)
+	rdb := redis.NewClient(&redis.Options{
+		Addr:     "10.11.34.110:6379",
+		Password: "", // no password set
+		DB:       0,  // use default DB
+	})
+	storage = NewRedisNewsStorage(rdb)
 
 	ctx, cancel := context.WithTimeout(context.TODO(), 60*time.Second)
+	go runServer()
+	go runBackgroundSubscriptions(ctx)
 
-	err = eventbus.ListenOne(ctx, "ghostnetwork.content.publications.created", subscriptionName, func(message *azservicebus.ReceivedMessage) error {
+	_, _ = fmt.Scanln()
+	defer cancel()
+}
+
+func runBackgroundSubscriptions(ctx context.Context) {
+	err := eventbus.ListenOne(ctx, "ghostnetwork.content.publications.created", subscriptionName, func(message *azservicebus.ReceivedMessage) error {
 		var model Publication
 		err := json.Unmarshal(message.Body, &model)
 		if err != nil {
 			return err
 		}
+
+		storage.AddPublication(&model)
 
 		return nil
 	})
@@ -58,6 +73,8 @@ func main() {
 		if err != nil {
 			return err
 		}
+
+		storage.RemovePublication(&model)
 
 		return nil
 	})
@@ -129,18 +146,16 @@ func main() {
 	if err != nil {
 		log.Fatalf("Error trying to listen ghostnetwork.profiles.friends.deleted: %v", err.Error())
 	}
-
-	go runServer()
-
-	_, _ = fmt.Scanln()
-	defer cancel()
 }
 
 func runServer() {
-	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		fmt.Println("Endpoint Hit")
+	r := mux.NewRouter()
+	r.HandleFunc("/{user}", func(w http.ResponseWriter, r *http.Request) {
+		log.Printf("Incoming http request %v\n", r.RequestURI)
+		user := mux.Vars(r)["user"]
+		cursor := mux.Vars(r)["cursor"]
 
-		body, err := json.Marshal(storage.Find())
+		body, err := json.Marshal(storage.FindNews(user, cursor))
 		if err != nil {
 			w.WriteHeader(http.StatusInternalServerError)
 			_, _ = w.Write([]byte(err.Error()))
@@ -148,67 +163,7 @@ func runServer() {
 		}
 
 		_, _ = w.Write(body)
-	})
-	log.Fatal(http.ListenAndServe(":10000", nil))
-}
-
-type NewsStorage interface {
-	Add(publication Publication)
-	Remove(publication Publication)
-	Find() []Publication
-}
-
-type RedisNewsStorage struct {
-	rdb *redis.Client
-}
-
-func (storage *RedisNewsStorage) Add(publication Publication) {
-}
-
-func (storage *RedisNewsStorage) Remove(publication Publication) {
-}
-
-func (storage *RedisNewsStorage) Find() []Publication {
-	return nil
-}
-
-func NewRedisNewsStorage(rdb *redis.Client) *RedisNewsStorage {
-	return &RedisNewsStorage{rdb: rdb}
-}
-
-type Publication struct {
-	Id      string
-	Content string
-	Author  *PublicationAuthor
-}
-
-type PublicationAuthor struct {
-	Id        string
-	FullName  string
-	AvatarUrl string
-}
-
-type RequestSent struct {
-	FromUser string
-	ToUser   string
-}
-
-type RequestCancelled struct {
-	FromUser string
-	ToUser   string
-}
-
-type RequestApproved struct {
-	User      string
-	Requester string
-}
-
-type RequestDeclined struct {
-	User      string
-	Requester string
-}
-
-type Deleted struct {
-	User   string
-	Friend string
+	}).Methods(http.MethodGet)
+	log.Println("Starting http server on port 10000")
+	log.Fatal(http.ListenAndServe(":10000", r))
 }
