@@ -52,7 +52,8 @@ func runBackgroundSubscriptions(ctx context.Context) {
 			return err
 		}
 
-		ctx, _ := context.WithTimeout(context.Background(), 30*time.Second)
+		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer cancel()
 		err = storage.AddPublication(ctx, &model)
 		if err != nil {
 			return err
@@ -71,7 +72,8 @@ func runBackgroundSubscriptions(ctx context.Context) {
 			return err
 		}
 
-		ctx, _ := context.WithTimeout(context.Background(), 30*time.Second)
+		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer cancel()
 		err = storage.UpdatePublication(ctx, &model)
 		if err != nil {
 			return err
@@ -90,7 +92,8 @@ func runBackgroundSubscriptions(ctx context.Context) {
 			return err
 		}
 
-		ctx, _ := context.WithTimeout(context.Background(), 30*time.Second)
+		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer cancel()
 		err = storage.RemovePublication(ctx, &model)
 		if err != nil {
 			return err
@@ -175,7 +178,8 @@ func runServer() {
 		user := mux.Vars(r)["user"]
 		cursor := mux.Vars(r)["cursor"]
 
-		ctx, _ := context.WithTimeout(context.Background(), 30*time.Second)
+		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer cancel()
 		news, err := storage.FindNews(ctx, user, cursor)
 		if err != nil {
 			w.WriteHeader(http.StatusInternalServerError)
