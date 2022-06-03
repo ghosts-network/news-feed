@@ -3,10 +3,8 @@ package main
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"github.com/Azure/azure-sdk-for-go/sdk/azidentity"
 	"github.com/Azure/azure-sdk-for-go/sdk/messaging/azservicebus"
-	"github.com/go-redis/redis/v8"
 	"github.com/gorilla/mux"
 	"log"
 	"net/http"
@@ -36,19 +34,14 @@ func main() {
 		},
 	})
 
-	rdb := redis.NewClient(&redis.Options{
-		Addr:     os.Getenv("REDIS_ADDRESS"),
-		Password: "", // no password set
-		DB:       0,  // use default DB
-	})
-	storage = NewRedisNewsStorage(rdb)
+	storage = NewMongoNewsStorage(nil)
 
-	ctx, cancel := context.WithTimeout(context.TODO(), 60*time.Second)
-	go runServer()
-	go runBackgroundSubscriptions(ctx)
-
-	_, _ = fmt.Scanln()
-	defer cancel()
+	//ctx, cancel := context.WithTimeout(context.TODO(), 60*time.Second)
+	//go runServer()
+	//go runBackgroundSubscriptions(ctx)
+	//
+	//_, _ = fmt.Scanln()
+	//defer cancel()
 }
 
 func runBackgroundSubscriptions(ctx context.Context) {
@@ -59,7 +52,8 @@ func runBackgroundSubscriptions(ctx context.Context) {
 			return err
 		}
 
-		err = storage.AddPublication(&model)
+		ctx, _ := context.WithTimeout(context.Background(), 30*time.Second)
+		err = storage.AddPublication(ctx, &model)
 		if err != nil {
 			return err
 		}
@@ -77,7 +71,8 @@ func runBackgroundSubscriptions(ctx context.Context) {
 			return err
 		}
 
-		err = storage.UpdatePublication(&model)
+		ctx, _ := context.WithTimeout(context.Background(), 30*time.Second)
+		err = storage.UpdatePublication(ctx, &model)
 		if err != nil {
 			return err
 		}
@@ -95,7 +90,8 @@ func runBackgroundSubscriptions(ctx context.Context) {
 			return err
 		}
 
-		err = storage.RemovePublication(&model)
+		ctx, _ := context.WithTimeout(context.Background(), 30*time.Second)
+		err = storage.RemovePublication(ctx, &model)
 		if err != nil {
 			return err
 		}
@@ -179,7 +175,15 @@ func runServer() {
 		user := mux.Vars(r)["user"]
 		cursor := mux.Vars(r)["cursor"]
 
-		body, err := json.Marshal(storage.FindNews(user, cursor))
+		ctx, _ := context.WithTimeout(context.Background(), 30*time.Second)
+		news, err := storage.FindNews(ctx, user, cursor)
+		if err != nil {
+			w.WriteHeader(http.StatusInternalServerError)
+			_, _ = w.Write([]byte(err.Error()))
+			return
+		}
+
+		body, err := json.Marshal(news)
 		if err != nil {
 			w.WriteHeader(http.StatusInternalServerError)
 			_, _ = w.Write([]byte(err.Error()))
