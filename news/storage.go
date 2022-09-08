@@ -1,23 +1,11 @@
-package main
+package news
 
 import (
 	"context"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
-	"time"
 )
-
-type NewsStorage interface {
-	AddPublication(ctx context.Context, publication *Publication) error
-	UpdatePublication(ctx context.Context, publication *Publication) error
-	RemovePublication(ctx context.Context, publication *Publication) error
-
-	AddUserSource(ctx context.Context, user string, source string) error
-	RemoveUserSource(ctx context.Context, user string, source string) error
-
-	FindNews(ctx context.Context, user string, cursor string) ([]Publication, error)
-}
 
 type MongoNewsStorage struct {
 	publications *mongo.Collection
@@ -26,7 +14,7 @@ type MongoNewsStorage struct {
 }
 
 func NewMongoNewsStorage(mongo *mongo.Client) *MongoNewsStorage {
-	ctx, _ := context.WithTimeout(context.Background(), 30*time.Second)
+	ctx := context.Background()
 	_ = mongo.Connect(ctx)
 
 	return &MongoNewsStorage{

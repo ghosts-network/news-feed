@@ -3,55 +3,26 @@ package main
 import (
 	"context"
 	"encoding/json"
-	"fmt"
-	"github.com/Azure/azure-sdk-for-go/sdk/azidentity"
 	"github.com/Azure/azure-sdk-for-go/sdk/messaging/azservicebus"
-	"github.com/gorilla/mux"
+	"github.com/ghosts-network/news-feed/news"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 	"log"
-	"net/http"
 	"os"
+	"os/signal"
+	"syscall"
 	"time"
 )
 
 const subscriptionName string = "ghostnetwork.newsfeed"
 
-var storage NewsStorage
-var eventbus *EventBus
-
 func main() {
-	connectionString := os.Getenv("SERVICEBUS_CONNECTION")
-	cred, err := azidentity.NewClientSecretCredential(os.Getenv("AZURE_TENANT_ID"), os.Getenv("AZURE_CLIENT_ID"), os.Getenv("AZURE_CLIENT_SECRET"), nil)
-	if err != nil {
-		log.Fatalf("Error configuring azure credentials: %v", err.Error())
-	}
+	storage := configureNewsStorage(os.Getenv("MONGO_CONNECTION"))
+	eventbus := configureEventBus(os.Getenv("SERVICEBUS_CONNECTION"))
 
-	client, _ := azservicebus.NewClientFromConnectionString(connectionString, nil)
-	eventbus = NewEventBus(client, log.Default(), &EventBusOptions{
-		Namespace: os.Getenv("SERVICEBUS_NAMESPACE"),
-		Azure: &AzureOptions{
-			SubscriptionId: os.Getenv("SERVICEBUS_AZURE_SUBSCRIPTION_ID"),
-			ResourceGroup:  os.Getenv("SERVICEBUS_AZURE_RESOURCE_GROUP"),
-			Credential:     cred,
-		},
-	})
-
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
-	mongoClient, _ := mongo.Connect(ctx, options.Client().ApplyURI("mongodb://localhost:27017"))
-	storage = NewMongoNewsStorage(mongoClient)
-
-	go runServer()
-	//go runBackgroundSubscriptions(ctx)
-
-	_, _ = fmt.Scanln()
-	defer cancel()
-}
-
-func runBackgroundSubscriptions(ctx context.Context) {
+	ctx, cancel := context.WithCancel(context.Background())
 	err := eventbus.ListenOne(ctx, "ghostnetwork.content.publications.created", subscriptionName, func(message *azservicebus.ReceivedMessage) error {
-		var model Publication
+		var model news.Publication
 		err := json.Unmarshal(message.Body, &model)
 		if err != nil {
 			return err
@@ -71,7 +42,7 @@ func runBackgroundSubscriptions(ctx context.Context) {
 	}
 
 	err = eventbus.ListenOne(ctx, "ghostnetwork.content.publications.updated", subscriptionName, func(message *azservicebus.ReceivedMessage) error {
-		var model Publication
+		var model news.Publication
 		err := json.Unmarshal(message.Body, &model)
 		if err != nil {
 			return err
@@ -91,7 +62,7 @@ func runBackgroundSubscriptions(ctx context.Context) {
 	}
 
 	err = eventbus.ListenOne(ctx, "ghostnetwork.content.publications.deleted", subscriptionName, func(message *azservicebus.ReceivedMessage) error {
-		var model Publication
+		var model news.Publication
 		err := json.Unmarshal(message.Body, &model)
 		if err != nil {
 			return err
@@ -174,33 +145,34 @@ func runBackgroundSubscriptions(ctx context.Context) {
 	if err != nil {
 		log.Fatalf("Error trying to listen ghostnetwork.profiles.friends.deleted: %v", err.Error())
 	}
+
+	sigc := make(chan os.Signal, 1)
+	signal.Notify(sigc,
+		syscall.SIGHUP,
+		syscall.SIGINT,
+		syscall.SIGTERM,
+		syscall.SIGQUIT)
+	<-sigc
+	cancel()
 }
 
-func runServer() {
-	r := mux.NewRouter()
-	r.HandleFunc("/{user}", func(w http.ResponseWriter, r *http.Request) {
-		log.Printf("Incoming http request %v\n", r.RequestURI)
-		user := mux.Vars(r)["user"]
-		cursor := mux.Vars(r)["cursor"]
+type NewsStorage interface {
+	AddPublication(ctx context.Context, publication *news.Publication) error
+	UpdatePublication(ctx context.Context, publication *news.Publication) error
+	RemovePublication(ctx context.Context, publication *news.Publication) error
 
-		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-		defer cancel()
-		news, err := storage.FindNews(ctx, user, cursor)
-		if err != nil {
-			w.WriteHeader(http.StatusInternalServerError)
-			_, _ = w.Write([]byte(err.Error()))
-			return
-		}
+	AddUserSource(ctx context.Context, user string, source string) error
+	RemoveUserSource(ctx context.Context, user string, source string) error
+}
 
-		body, err := json.Marshal(news)
-		if err != nil {
-			w.WriteHeader(http.StatusInternalServerError)
-			_, _ = w.Write([]byte(err.Error()))
-			return
-		}
+func configureNewsStorage(connectionString string) NewsStorage {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	mongoClient, _ := mongo.Connect(ctx, options.Client().ApplyURI(connectionString))
+	return news.NewMongoNewsStorage(mongoClient)
+}
 
-		_, _ = w.Write(body)
-	}).Methods(http.MethodGet)
-	log.Println("Starting http server on port 10000")
-	log.Fatal(http.ListenAndServe(":10000", r))
+func configureEventBus(connectionString string) *EventBus {
+	client, _ := azservicebus.NewClientFromConnectionString(connectionString, nil)
+	return NewEventBus(client, log.Default())
 }
