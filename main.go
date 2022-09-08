@@ -3,9 +3,12 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"github.com/Azure/azure-sdk-for-go/sdk/azidentity"
 	"github.com/Azure/azure-sdk-for-go/sdk/messaging/azservicebus"
 	"github.com/gorilla/mux"
+	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/mongo/options"
 	"log"
 	"net/http"
 	"os"
@@ -34,14 +37,16 @@ func main() {
 		},
 	})
 
-	storage = NewMongoNewsStorage(nil)
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	mongoClient, _ := mongo.Connect(ctx, options.Client().ApplyURI("mongodb://localhost:27017"))
+	storage = NewMongoNewsStorage(mongoClient)
 
-	//ctx, cancel := context.WithTimeout(context.TODO(), 60*time.Second)
-	//go runServer()
+	go runServer()
 	//go runBackgroundSubscriptions(ctx)
-	//
-	//_, _ = fmt.Scanln()
-	//defer cancel()
+
+	_, _ = fmt.Scanln()
+	defer cancel()
 }
 
 func runBackgroundSubscriptions(ctx context.Context) {

@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
 	"time"
 )
@@ -43,12 +44,21 @@ func (storage *MongoNewsStorage) AddUserSource(ctx context.Context, user string,
 
 	_, err := storage.sources.InsertOne(ctx, d)
 
+	// add publication from source to news feed
+
 	return err
 }
 
 func (storage *MongoNewsStorage) RemoveUserSource(ctx context.Context, user string, source string) error {
 	f := bson.D{{"user", user}, {"source", source}}
 	_, err := storage.sources.DeleteOne(ctx, f)
+	if err != nil {
+		return err
+	}
+
+	// remove publications from source from news feed
+	f = bson.D{{"user", user}, {"author.id", source}}
+	_, err = storage.news.DeleteMany(ctx, f)
 
 	return err
 }
@@ -66,7 +76,6 @@ func (storage *MongoNewsStorage) AddPublication(ctx context.Context, publication
 
 	_, err := storage.publications.InsertOne(ctx, d)
 
-	// find all users who have publication.Author.Id source
 	f := bson.D{{"source", publication.Author.Id}}
 	cur, err := storage.sources.Find(ctx, f)
 	if err != nil {
@@ -74,7 +83,7 @@ func (storage *MongoNewsStorage) AddPublication(ctx context.Context, publication
 	}
 	defer cur.Close(ctx)
 
-	var news []bson.D
+	var news []interface{}
 	for cur.Next(ctx) {
 		var result bson.D
 		err := cur.Decode(&result)
@@ -94,6 +103,10 @@ func (storage *MongoNewsStorage) AddPublication(ctx context.Context, publication
 			}},
 		})
 	}
+
+	if len(news) > 0 {
+		_, _ = storage.news.InsertMany(ctx, news)
+	}
 	if err := cur.Err(); err != nil {
 		return err
 	}
@@ -109,7 +122,12 @@ func (storage *MongoNewsStorage) UpdatePublication(ctx context.Context, publicat
 
 	_, err := storage.publications.UpdateOne(ctx, f, d)
 
-	// TODO: update publication in news
+	if err != nil {
+		return err
+	}
+
+	f = bson.D{{"publicationId", publication.Id}}
+	_, err = storage.news.UpdateMany(ctx, f, d)
 
 	return err
 }
@@ -143,13 +161,14 @@ func (storage *MongoNewsStorage) FindNews(ctx context.Context, user string, curs
 		}
 
 		m := result.Map()
+		am := m["author"].(primitive.D).Map()
 		news = append(news, Publication{
 			Id:      m["publicationId"].(string),
 			Content: m["content"].(string),
 			Author: &PublicationAuthor{
-				Id:        "",
-				FullName:  "",
-				AvatarUrl: "",
+				Id:        am["id"].(string),
+				FullName:  am["fullName"].(string),
+				AvatarUrl: am["avatarUrl"].(string),
 			},
 		})
 	}
