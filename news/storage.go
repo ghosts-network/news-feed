@@ -18,7 +18,7 @@ func NewMongoNewsStorage(mongo *mongo.Client) *MongoNewsStorage {
 	_ = mongo.Connect(ctx)
 
 	return &MongoNewsStorage{
-		publications: mongo.Database("newsfeed").Collection("publications"),
+		publications: mongo.Database("newsfeed").Collection("sourcePublications"),
 		sources:      mongo.Database("newsfeed").Collection("sources"),
 		news:         mongo.Database("newsfeed").Collection("news"),
 	}
@@ -49,6 +49,12 @@ func (storage *MongoNewsStorage) RemoveUserSource(ctx context.Context, user stri
 	_, err = storage.news.DeleteMany(ctx, f)
 
 	return err
+}
+
+func (storage *MongoNewsStorage) RemoveAllSources(ctx context.Context) (err error) {
+	_, err = storage.sources.DeleteMany(ctx, bson.D{})
+
+	return
 }
 
 func (storage *MongoNewsStorage) AddPublication(ctx context.Context, publication *Publication) error {
