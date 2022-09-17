@@ -3,8 +3,8 @@ package news
 import (
 	"context"
 	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
 type MongoNewsStorage struct {
@@ -14,9 +14,6 @@ type MongoNewsStorage struct {
 }
 
 func NewMongoNewsStorage(mongo *mongo.Client) *MongoNewsStorage {
-	ctx := context.Background()
-	_ = mongo.Connect(ctx)
-
 	return &MongoNewsStorage{
 		publications: mongo.Database("newsfeed").Collection("sourcePublications"),
 		sources:      mongo.Database("newsfeed").Collection("sources"),
@@ -51,26 +48,29 @@ func (storage *MongoNewsStorage) RemoveUserSource(ctx context.Context, user stri
 	return err
 }
 
-func (storage *MongoNewsStorage) RemoveAllSources(ctx context.Context) (err error) {
-	_, err = storage.sources.DeleteMany(ctx, bson.D{})
+func (storage *MongoNewsStorage) RemoveAllNews(ctx context.Context) error {
+	_, err := storage.publications.DeleteMany(ctx, bson.D{})
+	if err != nil {
+		return err
+	}
+	_, err = storage.news.DeleteMany(ctx, bson.D{})
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (storage *MongoNewsStorage) RemoveUserSources(ctx context.Context, user string) (err error) {
+	_, err = storage.sources.DeleteMany(ctx, bson.D{{"user", user}})
 
 	return
 }
 
-func (storage *MongoNewsStorage) AddPublication(ctx context.Context, publication *Publication) error {
-	d := bson.D{
-		{"_id", publication.Id},
-		{"content", publication.Content},
-		{"author", bson.D{
-			{"id", publication.Author.Id},
-			{"fullName", publication.Author.FullName},
-			{"avatarUrl", publication.Author.AvatarUrl},
-		}},
-	}
+func (storage *MongoNewsStorage) AddPublication(ctx context.Context, p *Publication) error {
+	_, err := storage.publications.InsertOne(ctx, p)
 
-	_, err := storage.publications.InsertOne(ctx, d)
-
-	f := bson.D{{"source", publication.Author.Id}}
+	f := bson.D{{"source", p.Author.Id}}
 	cur, err := storage.sources.Find(ctx, f)
 	if err != nil {
 		return err
@@ -79,22 +79,17 @@ func (storage *MongoNewsStorage) AddPublication(ctx context.Context, publication
 
 	var news []interface{}
 	for cur.Next(ctx) {
-		var result bson.D
+		var result SourceStruct
 		err := cur.Decode(&result)
 		if err != nil {
 			return err
 		}
 
-		m := result.Map()
-		news = append(news, bson.D{
-			{"publicationId", publication.Id},
-			{"user", m["user"]},
-			{"content", publication.Content},
-			{"author", bson.D{
-				{"id", publication.Author.Id},
-				{"fullName", publication.Author.FullName},
-				{"avatarUrl", publication.Author.AvatarUrl},
-			}},
+		news = append(news, NewsStruct{
+			PublicationId: p.Id,
+			Source:        p.Author.Id,
+			User:          result.User,
+			Order:         p.CreatedOn,
 		})
 	}
 
@@ -140,35 +135,73 @@ func (storage *MongoNewsStorage) RemovePublication(ctx context.Context, publicat
 }
 
 func (storage *MongoNewsStorage) FindNews(ctx context.Context, user string, cursor string) ([]Publication, error) {
-	f := bson.D{{"user", user}}
-	cur, err := storage.news.Find(ctx, f)
+	pIds, err := storage.findNews(ctx, user, cursor)
+	if err != nil {
+		return nil, err
+	}
+
+	if len(pIds) == 0 {
+		return make([]Publication, 0), nil
+	}
+
+	cur, err := storage.publications.Find(ctx,
+		bson.D{{"_id", bson.D{{"$in", pIds}}}},
+		options.Find().SetSort(bson.D{{"createOn", -1}}))
 	if err != nil {
 		return nil, err
 	}
 	defer cur.Close(ctx)
-	var news []Publication
+	var publications []Publication
 	for cur.Next(ctx) {
-		var result bson.D
+		var result Publication
 		err := cur.Decode(&result)
 		if err != nil {
 			return nil, err
 		}
 
-		m := result.Map()
-		am := m["author"].(primitive.D).Map()
-		news = append(news, Publication{
-			Id:      m["publicationId"].(string),
-			Content: m["content"].(string),
-			Author: &PublicationAuthor{
-				Id:        am["id"].(string),
-				FullName:  am["fullName"].(string),
-				AvatarUrl: am["avatarUrl"].(string),
-			},
-		})
+		publications = append(publications, result)
+	}
+	if err := cur.Err(); err != nil {
+		return nil, err
+	}
+
+	return publications, nil
+}
+
+func (storage *MongoNewsStorage) findNews(ctx context.Context, user string, cursor string) ([]string, error) {
+	cur, err := storage.news.Find(ctx,
+		bson.D{{"user", user}},
+		options.Find().SetSort(bson.D{{"order", -1}}))
+
+	if err != nil {
+		return nil, err
+	}
+	defer cur.Close(ctx)
+	var news []string
+	for cur.Next(ctx) {
+		var result NewsStruct
+		err := cur.Decode(&result)
+		if err != nil {
+			return nil, err
+		}
+
+		news = append(news, result.PublicationId)
 	}
 	if err := cur.Err(); err != nil {
 		return nil, err
 	}
 
 	return news, nil
+}
+
+type NewsStruct struct {
+	PublicationId string `bson:"publicationId"`
+	Source        string `bson:"source"`
+	User          string `bson:"user"`
+	Order         int64  `bson:"order"`
+}
+
+type SourceStruct struct {
+	User   string `bson:"user"`
+	Source string `bson:"source"`
 }

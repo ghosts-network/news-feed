@@ -18,6 +18,7 @@ func main() {
 
 	r := mux.NewRouter()
 	r.HandleFunc("/{user}", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
 		log.Printf("Incoming http request %v\n", r.RequestURI)
 		user := mux.Vars(r)["user"]
 		cursor := mux.Vars(r)["cursor"]
