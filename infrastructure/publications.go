@@ -20,11 +20,11 @@ func NewPublicationsClient(baseUrl string) *PublicationsClient {
 func (c PublicationsClient) GetPublications(cursor string, take int) ([]Publication, string, error) {
 	url := fmt.Sprintf("%s/publications?cursor=%s&take=%d", c.baseUrl, cursor, take)
 	resp, err := http.Get(url)
-	defer resp.Body.Close()
 
 	if err != nil {
 		return nil, "", err
 	}
+	defer resp.Body.Close()
 
 	rb, err := ioutil.ReadAll(resp.Body)
 	if err != nil {

@@ -5,8 +5,6 @@ import (
 	"encoding/json"
 	"github.com/Azure/azure-sdk-for-go/sdk/messaging/azservicebus"
 	"github.com/ghosts-network/news-feed/news"
-	"go.mongodb.org/mongo-driver/mongo"
-	"go.mongodb.org/mongo-driver/mongo/options"
 	"log"
 	"os"
 	"os/signal"
@@ -17,7 +15,7 @@ import (
 const subscriptionName string = "ghostnetwork.newsfeed"
 
 func main() {
-	storage := configureNewsStorage(os.Getenv("MONGO_CONNECTION"))
+	storage := news.NewMongoNewsStorage(os.Getenv("MONGO_CONNECTION"))
 	eventbus := configureEventBus(os.Getenv("SERVICEBUS_CONNECTION"))
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -154,22 +152,6 @@ func main() {
 		syscall.SIGQUIT)
 	<-sigc
 	cancel()
-}
-
-type NewsStorage interface {
-	AddPublication(ctx context.Context, publication *news.Publication) error
-	UpdatePublication(ctx context.Context, publication *news.Publication) error
-	RemovePublication(ctx context.Context, publication *news.Publication) error
-
-	AddUserSource(ctx context.Context, user string, source string) error
-	RemoveUserSource(ctx context.Context, user string, source string) error
-}
-
-func configureNewsStorage(connectionString string) NewsStorage {
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
-	mongoClient, _ := mongo.Connect(ctx, options.Client().ApplyURI(connectionString))
-	return news.NewMongoNewsStorage(mongoClient)
 }
 
 func configureEventBus(connectionString string) *EventBus {

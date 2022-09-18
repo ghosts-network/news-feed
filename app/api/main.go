@@ -3,10 +3,10 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"github.com/ghosts-network/news-feed/infrastructure"
+	"github.com/ghosts-network/news-feed/migrator"
 	"github.com/ghosts-network/news-feed/news"
 	"github.com/gorilla/mux"
-	"go.mongodb.org/mongo-driver/mongo"
-	"go.mongodb.org/mongo-driver/mongo/options"
 	"log"
 	"net/http"
 	"os"
@@ -14,18 +14,23 @@ import (
 )
 
 func main() {
-	storage := configureNewsStorage(os.Getenv("MONGO_CONNECTION"))
+	profileClient := infrastructure.NewProfilesClient(os.Getenv("PROFILES_ADDRESS"))
+	relationsClient := infrastructure.NewRelationsClient(os.Getenv("PROFILES_ADDRESS"))
+	publicationsClient := infrastructure.NewPublicationsClient(os.Getenv("CONTENT_ADDRESS"))
+	newsStorage := news.NewMongoNewsStorage(os.Getenv("MONGO_CONNECTION"))
+
+	m := migrator.NewMigrator(profileClient, relationsClient, publicationsClient, newsStorage)
 
 	r := mux.NewRouter()
 	r.HandleFunc("/{user}", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-		log.Printf("Incoming http request %v\n", r.RequestURI)
+		log.Printf("[INFO] Incoming http request %v\n", r.RequestURI)
 		user := mux.Vars(r)["user"]
 		cursor := mux.Vars(r)["cursor"]
 
 		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 		defer cancel()
-		ns, err := storage.FindNews(ctx, user, cursor)
+		ns, err := newsStorage.FindNews(ctx, user, cursor)
 		if err != nil {
 			w.WriteHeader(http.StatusInternalServerError)
 			_, _ = w.Write([]byte(err.Error()))
@@ -42,17 +47,28 @@ func main() {
 		_, _ = w.Write(body)
 	}).Methods(http.MethodGet)
 
-	log.Println("Starting http server on port 10000")
+	r.HandleFunc("/migrator/users", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		log.Printf("[INFO] Incoming http request %v\n", r.RequestURI)
+		go m.MigrateUsers()
+		w.WriteHeader(http.StatusAccepted)
+	}).Methods(http.MethodPost)
+
+	r.HandleFunc("/migrator/users/{user}", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		log.Printf("[INFO] Incoming http request %v\n", r.RequestURI)
+		user := mux.Vars(r)["user"]
+		go m.MigrateUser(user)
+		w.WriteHeader(http.StatusAccepted)
+	}).Methods(http.MethodPost)
+
+	r.HandleFunc("/migrator/publications", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		log.Printf("[INFO] Incoming http request %v\n", r.RequestURI)
+		go m.MigratePublications()
+		w.WriteHeader(http.StatusAccepted)
+	}).Methods(http.MethodPost)
+
+	log.Println("[INFO] Starting http server on port 10000")
 	log.Fatal(http.ListenAndServe(":10000", r))
-}
-
-type NewsStorage interface {
-	FindNews(ctx context.Context, user string, cursor string) ([]news.Publication, error)
-}
-
-func configureNewsStorage(connectionString string) NewsStorage {
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
-	mongoClient, _ := mongo.Connect(ctx, options.Client().ApplyURI(connectionString))
-	return news.NewMongoNewsStorage(mongoClient)
 }

@@ -5,6 +5,7 @@ import (
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
+	"time"
 )
 
 type MongoNewsStorage struct {
@@ -13,11 +14,15 @@ type MongoNewsStorage struct {
 	news         *mongo.Collection
 }
 
-func NewMongoNewsStorage(mongo *mongo.Client) *MongoNewsStorage {
+func NewMongoNewsStorage(connectionString string) *MongoNewsStorage {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	mc, _ := mongo.Connect(ctx, options.Client().ApplyURI(connectionString))
+
 	return &MongoNewsStorage{
-		publications: mongo.Database("newsfeed").Collection("sourcePublications"),
-		sources:      mongo.Database("newsfeed").Collection("sources"),
-		news:         mongo.Database("newsfeed").Collection("news"),
+		publications: mc.Database("newsfeed").Collection("sourcePublications"),
+		sources:      mc.Database("newsfeed").Collection("sources"),
+		news:         mc.Database("newsfeed").Collection("news"),
 	}
 }
 

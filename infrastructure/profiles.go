@@ -18,11 +18,11 @@ func NewProfilesClient(baseUrl string) *ProfilesClient {
 func (c ProfilesClient) GetProfiles(skip int, take int) ([]Profile, error) {
 	url := fmt.Sprintf("%s/profiles?skip=%d&take=%d", c.baseUrl, skip, take)
 	resp, err := http.Get(url)
-	defer resp.Body.Close()
 
 	if err != nil {
 		return nil, err
 	}
+	defer resp.Body.Close()
 
 	rb, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
