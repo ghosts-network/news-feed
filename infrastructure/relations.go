@@ -49,7 +49,7 @@ func (c RelationsClient) GetOutgoingRequests(user string, skip int, take int) ([
 		return nil, err
 	}
 
-	var ids []string
+	ids := make([]string, take)
 	err = json.Unmarshal(rb, &ids)
 
 	return ids, err

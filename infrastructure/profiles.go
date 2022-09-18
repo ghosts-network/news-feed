@@ -29,7 +29,7 @@ func (c ProfilesClient) GetProfiles(skip int, take int) ([]Profile, error) {
 		return nil, err
 	}
 
-	var ps []Profile
+	ps := make([]Profile, take)
 	err = json.Unmarshal(rb, &ps)
 
 	return ps, err
