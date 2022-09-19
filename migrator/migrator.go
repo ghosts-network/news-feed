@@ -51,7 +51,8 @@ func (m Migrator) MigrateUsers() {
 }
 
 func (m Migrator) MigrateUser(user string) {
-	ctx, _ := context.WithTimeout(context.Background(), 5*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
 	_ = m.ns.RemoveUserSources(ctx, user)
 	m.migrateFriends(user)
 	m.migrateOutgoingRequests(user)
@@ -64,7 +65,8 @@ func (m Migrator) MigrateUserAsync(user string, wg *sync.WaitGroup) {
 }
 
 func (m Migrator) MigratePublications() {
-	ctx, _ := context.WithTimeout(context.Background(), 5*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
 	_ = m.ns.RemoveAllNews(ctx)
 
 	var cursor string
@@ -82,8 +84,8 @@ func (m Migrator) MigratePublications() {
 		}
 
 		for _, publication := range ps {
-			ctx, _ := context.WithTimeout(context.Background(), 5*time.Second)
-			m.ns.AddPublication(ctx, &news.Publication{
+			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			_ = m.ns.AddPublication(ctx, &news.Publication{
 				Id:        publication.Id,
 				Content:   publication.Content,
 				Author:    publication.Author,
@@ -91,6 +93,8 @@ func (m Migrator) MigratePublications() {
 				UpdatedOn: publication.UpdatedOn.UnixMilli(),
 				Media:     publication.Media,
 			})
+
+			cancel()
 			log.Printf("[INFO] Publication %s migrated\n", publication.Id)
 		}
 
@@ -118,13 +122,15 @@ func (m Migrator) migrateFriends(user string) {
 		}
 
 		for _, friend := range friends {
-			ctx, _ := context.WithTimeout(context.Background(), 5*time.Second)
+			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 			err := m.ns.AddUserSource(ctx, user, friend)
 			if err != nil {
 				log.Printf("[ERR] Failed to migrate friend %s for %s\n", friend, user)
 			} else {
 				log.Printf("[INFO] Friend %s for %s migrated\n", friend, user)
 			}
+
+			cancel()
 		}
 
 		if len(friends) < take {
@@ -150,13 +156,15 @@ func (m Migrator) migrateOutgoingRequests(user string) {
 		}
 
 		for _, r := range rs {
-			ctx, _ := context.WithTimeout(context.Background(), 5*time.Second)
+			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 			err := m.ns.AddUserSource(ctx, user, r)
 			if err != nil {
 				log.Printf("[ERR] Failed to migrate outgoing request from %s to %s\n", user, r)
 			} else {
 				log.Printf("[INFO] Outgoing request from %s to %s migrated\n", user, r)
 			}
+
+			cancel()
 		}
 
 		if len(rs) < take {
