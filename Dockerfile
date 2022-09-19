@@ -7,7 +7,7 @@ COPY go.sum ./
 RUN go mod download
 
 COPY *.go ./
-RUN go build -o /news-feed
+RUN go build -o /news-feed ./app/api
 
 EXPOSE 3001
 
