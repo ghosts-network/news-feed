@@ -5,7 +5,7 @@ type Publication struct {
 	Content   string             `json:"content" bson:"content"`
 	Author    *PublicationAuthor `json:"author" bson:"author"`
 	CreatedOn int64              `json:"createdOn" bson:"createdOn"`
-	UpdatedOn int64              `json:"updatedOn" bson:"createdOn"`
+	UpdatedOn int64              `json:"updatedOn" bson:"updatedOn"`
 	Media     []*Media           `json:"media" bson:"media"`
 }
 
