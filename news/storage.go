@@ -151,7 +151,7 @@ func (storage *MongoNewsStorage) FindNews(ctx context.Context, user string, curs
 
 	cur, err := storage.publications.Find(ctx,
 		bson.D{{"_id", bson.D{{"$in", pIds}}}},
-		options.Find().SetSort(bson.D{{"createOn", -1}}))
+		options.Find().SetSort(bson.D{{"createdOn", -1}}))
 	if err != nil {
 		return nil, err
 	}
