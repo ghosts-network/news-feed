@@ -37,7 +37,19 @@ func main() {
 			return
 		}
 
-		body, err := json.Marshal(ns)
+		ps := make([]infrastructure.Publication, 0, len(ns))
+		for _, p := range ns {
+			ps = append(ps, infrastructure.Publication{
+				Id:        p.Id,
+				Content:   p.Content,
+				Author:    p.Author,
+				CreatedOn: time.UnixMilli(p.CreatedOn).In(time.UTC),
+				UpdatedOn: time.UnixMilli(p.UpdatedOn).In(time.UTC),
+				Media:     p.Media,
+			})
+		}
+
+		body, err := json.Marshal(ps)
 		if err != nil {
 			w.WriteHeader(http.StatusInternalServerError)
 			_, _ = w.Write([]byte(err.Error()))
