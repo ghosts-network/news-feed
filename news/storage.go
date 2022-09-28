@@ -33,8 +33,22 @@ func (storage *MongoNewsStorage) AddUserSource(ctx context.Context, user string,
 	}
 
 	_, err := storage.sources.InsertOne(ctx, d)
+	if err != nil {
+		return err
+	}
 
 	// add publication from source to news feed
+	ps, err := storage.findPublications(ctx, source)
+	var news []interface{}
+	for _, p := range ps {
+		news = append(news, NewsStruct{
+			PublicationId: p.Id,
+			Source:        source,
+			User:          user,
+			Order:         p.CreatedOn,
+		})
+	}
+	_, err = storage.news.InsertMany(ctx, news)
 
 	return err
 }
@@ -168,6 +182,26 @@ func (storage *MongoNewsStorage) FindNews(ctx context.Context, user string, curs
 	}
 	if err := cur.Err(); err != nil {
 		return nil, err
+	}
+
+	return publications, nil
+}
+
+func (storage *MongoNewsStorage) findPublications(ctx context.Context, author string) ([]Publication, error) {
+	cur, err := storage.publications.Find(ctx, bson.D{{"author._id", author}})
+
+	if err != nil {
+		return nil, err
+	}
+	defer cur.Close(ctx)
+	var publications []Publication
+
+	for cur.Next(ctx) {
+		var result Publication
+		err := cur.Decode(&result)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	return publications, nil
