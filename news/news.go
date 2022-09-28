@@ -1,12 +1,14 @@
 package news
 
+import "time"
+
 type Publication struct {
-	Id        string             `json:"id" bson:"_id"`
-	Content   string             `json:"content" bson:"content"`
-	Author    *PublicationAuthor `json:"author" bson:"author"`
-	CreatedOn int64              `json:"createdOn" bson:"createdOn"`
-	UpdatedOn int64              `json:"updatedOn" bson:"updatedOn"`
-	Media     []*Media           `json:"media" bson:"media"`
+	Id        string             `json:"id"`
+	Content   string             `json:"content"`
+	Author    *PublicationAuthor `json:"author"`
+	CreatedOn time.Time          `json:"createdOn"`
+	UpdatedOn time.Time          `json:"updatedOn"`
+	Media     []*Media           `json:"media"`
 }
 
 type PublicationAuthor struct {

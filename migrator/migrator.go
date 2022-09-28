@@ -85,14 +85,7 @@ func (m Migrator) MigratePublications() {
 
 		for _, publication := range ps {
 			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-			_ = m.ns.AddPublication(ctx, &news.Publication{
-				Id:        publication.Id,
-				Content:   publication.Content,
-				Author:    publication.Author,
-				CreatedOn: publication.CreatedOn.UnixMilli(),
-				UpdatedOn: publication.UpdatedOn.UnixMilli(),
-				Media:     publication.Media,
-			})
+			_ = m.ns.AddPublication(ctx, &publication)
 
 			cancel()
 			log.Printf("[INFO] Publication %s migrated\n", publication.Id)

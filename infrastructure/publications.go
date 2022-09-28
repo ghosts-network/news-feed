@@ -6,7 +6,6 @@ import (
 	"github.com/ghosts-network/news-feed/news"
 	"io/ioutil"
 	"net/http"
-	"time"
 )
 
 type PublicationsClient struct {
@@ -17,7 +16,7 @@ func NewPublicationsClient(baseUrl string) *PublicationsClient {
 	return &PublicationsClient{baseUrl: baseUrl}
 }
 
-func (c PublicationsClient) GetPublications(cursor string, take int) ([]Publication, string, error) {
+func (c PublicationsClient) GetPublications(cursor string, take int) ([]news.Publication, string, error) {
 	url := fmt.Sprintf("%s/publications?cursor=%s&take=%d", c.baseUrl, cursor, take)
 	resp, err := http.Get(url)
 
@@ -31,19 +30,10 @@ func (c PublicationsClient) GetPublications(cursor string, take int) ([]Publicat
 		return nil, "", err
 	}
 
-	ps := make([]Publication, take)
+	ps := make([]news.Publication, take)
 	err = json.Unmarshal(rb, &ps)
 
 	nextCursor := resp.Header.Get("X-Cursor")
 
 	return ps, nextCursor, err
-}
-
-type Publication struct {
-	Id        string                  `json:"id"`
-	Content   string                  `json:"content"`
-	Author    *news.PublicationAuthor `json:"author"`
-	CreatedOn time.Time               `json:"createdOn"`
-	UpdatedOn time.Time               `json:"updatedOn"`
-	Media     []*news.Media           `json:"media"`
 }
