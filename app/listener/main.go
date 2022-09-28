@@ -68,12 +68,7 @@ func main() {
 
 		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 		defer cancel()
-		err = storage.RemovePublication(ctx, &model)
-		if err != nil {
-			return err
-		}
-
-		return nil
+		return storage.RemovePublication(ctx, &model)
 	})
 	if err != nil {
 		log.Fatalf("Error trying to listen ghostnetwork.content.publications.deleted: %v", err.Error())
@@ -86,7 +81,10 @@ func main() {
 			return err
 		}
 
-		return nil
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+
+		return storage.AddUserSource(ctx, model.FromUser, model.ToUser)
 	})
 	if err != nil {
 		log.Fatalf("Error trying to listen ghostnetwork.profiles.friends.requestsent: %v", err.Error())
@@ -94,12 +92,7 @@ func main() {
 
 	err = eventbus.ListenOne(ctx, "ghostnetwork.profiles.friends.requestcancelled", subscriptionName, func(message *azservicebus.ReceivedMessage) error {
 		var model RequestCancelled
-		err := json.Unmarshal(message.Body, &model)
-		if err != nil {
-			return err
-		}
-
-		return nil
+		return json.Unmarshal(message.Body, &model)
 	})
 	if err != nil {
 		log.Fatalf("Error trying to listen ghostnetwork.profiles.friends.requestcancelled: %v", err.Error())
@@ -112,7 +105,10 @@ func main() {
 			return err
 		}
 
-		return nil
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+
+		return storage.AddUserSource(ctx, model.User, model.Requester)
 	})
 	if err != nil {
 		log.Fatalf("Error trying to listen ghostnetwork.profiles.friends.requestapproved: %v", err.Error())
