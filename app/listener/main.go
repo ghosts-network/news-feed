@@ -92,7 +92,15 @@ func main() {
 
 	err = eventbus.ListenOne(ctx, "ghostnetwork.profiles.friends.requestcancelled", subscriptionName, func(message *azservicebus.ReceivedMessage) error {
 		var model RequestCancelled
-		return json.Unmarshal(message.Body, &model)
+		err := json.Unmarshal(message.Body, &model)
+		if err != nil {
+			return err
+		}
+
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+
+		return storage.RemoveUserSource(ctx, model.FromUser, model.ToUser)
 	})
 	if err != nil {
 		log.Fatalf("Error trying to listen ghostnetwork.profiles.friends.requestcancelled: %v", err.Error())
@@ -114,19 +122,6 @@ func main() {
 		log.Fatalf("Error trying to listen ghostnetwork.profiles.friends.requestapproved: %v", err.Error())
 	}
 
-	err = eventbus.ListenOne(ctx, "ghostnetwork.profiles.friends.requestdeclined", subscriptionName, func(message *azservicebus.ReceivedMessage) error {
-		var model RequestDeclined
-		err := json.Unmarshal(message.Body, &model)
-		if err != nil {
-			return err
-		}
-
-		return nil
-	})
-	if err != nil {
-		log.Fatalf("Error trying to listen ghostnetwork.profiles.friends.requestdeclined: %v", err.Error())
-	}
-
 	err = eventbus.ListenOne(ctx, "ghostnetwork.profiles.friends.deleted", subscriptionName, func(message *azservicebus.ReceivedMessage) error {
 		var model Deleted
 		err := json.Unmarshal(message.Body, &model)
@@ -134,7 +129,10 @@ func main() {
 			return err
 		}
 
-		return nil
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+
+		return storage.RemoveUserSource(ctx, model.User, model.Friend)
 	})
 	if err != nil {
 		log.Fatalf("Error trying to listen ghostnetwork.profiles.friends.deleted: %v", err.Error())
