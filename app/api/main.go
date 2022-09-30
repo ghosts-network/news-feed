@@ -100,7 +100,7 @@ func scopedLoggerMiddleware(next http.Handler) http.Handler {
 			id = uuid.NewString()
 		}
 
-		newContext := context.WithValue(r.Context(), "logger", log.WithValue("requestId", id))
+		newContext := context.WithValue(r.Context(), "logger", log.WithValue("operationId", id))
 		next.ServeHTTP(w, r.WithContext(newContext))
 	})
 }

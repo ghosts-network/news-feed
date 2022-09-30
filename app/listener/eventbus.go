@@ -34,6 +34,7 @@ func (eb EventBus) ListenOne(ctx context.Context, topicName string, subscription
 				st := time.Now()
 
 				scopedLogger := eb.logger.
+					WithValue("operationId", message.CorrelationID).
 					WithValue("messageId", message.MessageID).
 					WithValue("topic", topicName).
 					Info(fmt.Sprintf("Message %s processing started", message.MessageID))
