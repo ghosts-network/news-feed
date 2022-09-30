@@ -56,12 +56,8 @@ func main() {
 
 		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 		defer cancel()
-		err = storage.UpdatePublication(ctx, &model)
-		if err != nil {
-			return err
-		}
 
-		return nil
+		return storage.UpdatePublication(ctx, &model)
 	})
 	if err != nil {
 		log.Error(errors.Wrap(err, "Failed to subscribe on ghostnetwork.content.publications.updated"))
