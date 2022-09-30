@@ -13,6 +13,7 @@ import (
 	"github.com/pkg/errors"
 	"net/http"
 	"os"
+	"strconv"
 	"time"
 )
 
@@ -30,12 +31,13 @@ func main() {
 	r.HandleFunc("/{user}", func(w http.ResponseWriter, r *http.Request) {
 		l := r.Context().Value("logger").(*utils.Logger)
 		user := mux.Vars(r)["user"]
-		cursor := mux.Vars(r)["cursor"]
+		cursor := r.URL.Query().Get("cursor")
+		take, _ := strconv.Atoi(r.URL.Query().Get("take"))
 
 		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 		defer cancel()
 
-		ps, err := newsStorage.FindNews(ctx, user, cursor)
+		ps, err := newsStorage.FindNews(ctx, user, cursor, take)
 		if err != nil {
 			l.Error(errors.Wrap(err, fmt.Sprintf("Failed to fetch news")))
 			w.WriteHeader(http.StatusInternalServerError)
@@ -51,6 +53,10 @@ func main() {
 			return
 		}
 
+		if len(ps) > 0 {
+			c := ps[len(ps)-1].Id
+			w.Header().Set("X-Cursor", c)
+		}
 		_, _ = w.Write(body)
 	}).Methods(http.MethodGet)
 

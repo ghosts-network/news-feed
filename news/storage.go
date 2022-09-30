@@ -169,8 +169,8 @@ func (storage *MongoNewsStorage) RemovePublication(ctx context.Context, publicat
 	return err
 }
 
-func (storage *MongoNewsStorage) FindNews(ctx context.Context, user string, cursor string) ([]Publication, error) {
-	pIds, err := storage.findNews(ctx, user, cursor)
+func (storage *MongoNewsStorage) FindNews(ctx context.Context, user string, cursor string, take int) ([]Publication, error) {
+	pIds, err := storage.findNews(ctx, user, cursor, take)
 	if err != nil {
 		return nil, err
 	}
@@ -232,10 +232,17 @@ func (storage *MongoNewsStorage) findPublications(ctx context.Context, author st
 	return publications, nil
 }
 
-func (storage *MongoNewsStorage) findNews(ctx context.Context, user string, cursor string) ([]primitive.ObjectID, error) {
+func (storage *MongoNewsStorage) findNews(ctx context.Context, user string, cursor string, take int) ([]primitive.ObjectID, error) {
+	filter := bson.M{"user": user}
+	if oId, err := primitive.ObjectIDFromHex(cursor); err == nil {
+		filter["publicationId"] = bson.M{"$lt": oId}
+	}
+
 	cur, err := storage.news.Find(ctx,
-		bson.D{{"user", user}},
-		options.Find().SetSort(bson.D{{"order", -1}}))
+		filter,
+		options.Find().
+			SetSort(bson.D{{"order", -1}}).
+			SetLimit(int64(take)))
 
 	if err != nil {
 		return nil, err
