@@ -21,9 +21,9 @@ func NewMongoNewsStorage(connectionString string) *MongoNewsStorage {
 	mc, _ := mongo.Connect(ctx, options.Client().ApplyURI(connectionString))
 
 	return &MongoNewsStorage{
-		publications: mc.Database("newsfeed").Collection("publications"),
-		sources:      mc.Database("newsfeed").Collection("sources"),
-		news:         mc.Database("newsfeed").Collection("news"),
+		publications: mc.Database("newsfeed2").Collection("publications"),
+		sources:      mc.Database("newsfeed2").Collection("sources"),
+		news:         mc.Database("newsfeed2").Collection("news"),
 	}
 }
 

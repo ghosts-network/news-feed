@@ -9,15 +9,16 @@ import (
 
 type RelationsClient struct {
 	baseUrl string
+	client  *http.Client
 }
 
-func NewRelationsClient(baseUrl string) *RelationsClient {
-	return &RelationsClient{baseUrl: baseUrl}
+func NewRelationsClient(baseUrl string, client *http.Client) *RelationsClient {
+	return &RelationsClient{baseUrl: baseUrl, client: client}
 }
 
 func (c RelationsClient) GetFriends(user string, skip int, take int) ([]string, error) {
 	url := fmt.Sprintf("%s/relations/%s/friends?skip=%d&take=%d", c.baseUrl, user, skip, take)
-	resp, err := http.Get(url)
+	resp, err := c.client.Get(url)
 
 	if err != nil {
 		return nil, err

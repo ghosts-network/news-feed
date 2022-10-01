@@ -3,21 +3,27 @@ package infrastructure
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/ghosts-network/news-feed/utils"
 	"io/ioutil"
 	"net/http"
 )
 
 type ProfilesClient struct {
+	logger  *utils.Logger
+	client  *http.Client
 	baseUrl string
 }
 
-func NewProfilesClient(baseUrl string) *ProfilesClient {
-	return &ProfilesClient{baseUrl: baseUrl}
+func NewProfilesClient(baseUrl string, client *http.Client) *ProfilesClient {
+	return &ProfilesClient{
+		client:  client,
+		baseUrl: baseUrl,
+	}
 }
 
 func (c ProfilesClient) GetProfiles(skip int, take int) ([]Profile, error) {
 	url := fmt.Sprintf("%s/profiles?skip=%d&take=%d", c.baseUrl, skip, take)
-	resp, err := http.Get(url)
+	resp, err := c.client.Get(url)
 
 	if err != nil {
 		return nil, err

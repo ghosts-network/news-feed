@@ -21,10 +21,6 @@ var log *utils.Logger
 
 func main() {
 	log = utils.NewLogger("news-feed-api")
-
-	profileClient := infrastructure.NewProfilesClient(os.Getenv("PROFILES_ADDRESS"))
-	relationsClient := infrastructure.NewRelationsClient(os.Getenv("PROFILES_ADDRESS"))
-	publicationsClient := infrastructure.NewPublicationsClient(os.Getenv("CONTENT_ADDRESS"))
 	newsStorage := news.NewMongoNewsStorage(os.Getenv("MONGO_CONNECTION"))
 
 	r := mux.NewRouter()
@@ -64,26 +60,20 @@ func main() {
 	}).Methods(http.MethodGet)
 
 	r.HandleFunc("/migrator/users", func(w http.ResponseWriter, r *http.Request) {
-		go migrator.
-			NewMigrator(profileClient, relationsClient, publicationsClient, newsStorage,
-				r.Context().Value("logger").(*utils.Logger)).
+		go getMigrator(r.Context().Value("logger").(*utils.Logger)).
 			MigrateUsers()
 		w.WriteHeader(http.StatusAccepted)
 	}).Methods(http.MethodPost)
 
 	r.HandleFunc("/migrator/users/{user}", func(w http.ResponseWriter, r *http.Request) {
 		user := mux.Vars(r)["user"]
-		go migrator.
-			NewMigrator(profileClient, relationsClient, publicationsClient, newsStorage,
-				r.Context().Value("logger").(*utils.Logger)).
+		go getMigrator(r.Context().Value("logger").(*utils.Logger)).
 			MigrateUser(user)
 		w.WriteHeader(http.StatusAccepted)
 	}).Methods(http.MethodPost)
 
 	r.HandleFunc("/migrator/publications", func(w http.ResponseWriter, r *http.Request) {
-		go migrator.
-			NewMigrator(profileClient, relationsClient, publicationsClient, newsStorage,
-				r.Context().Value("logger").(*utils.Logger)).
+		go getMigrator(r.Context().Value("logger").(*utils.Logger)).
 			MigratePublications()
 		w.WriteHeader(http.StatusAccepted)
 	}).Methods(http.MethodPost)
@@ -111,7 +101,9 @@ func scopedLoggerMiddleware(next http.Handler) http.Handler {
 func loggingMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		st := time.Now()
-		scopedLog := r.Context().Value("logger").(*utils.Logger).
+		scopedLog := r.Context().Value("logger").(*utils.Logger)
+
+		scopedLog.
 			Info(fmt.Sprintf("%s %s request started", r.Method, r.RequestURI))
 
 		sw := NewStatusWriter(w)
@@ -146,4 +138,15 @@ func NewStatusWriter(w http.ResponseWriter) *StatusWriter {
 func (w *StatusWriter) WriteHeader(status int) {
 	w.Status = status
 	w.ResponseWriter.WriteHeader(status)
+}
+
+func getMigrator(logger *utils.Logger) *migrator.Migrator {
+	httpClient := infrastructure.NewScopedClient(logger)
+
+	profileClient := infrastructure.NewProfilesClient(os.Getenv("PROFILES_ADDRESS"), httpClient)
+	relationsClient := infrastructure.NewRelationsClient(os.Getenv("PROFILES_ADDRESS"), httpClient)
+	publicationsClient := infrastructure.NewPublicationsClient(os.Getenv("CONTENT_ADDRESS"), httpClient)
+	newsStorage := news.NewMongoNewsStorage(os.Getenv("MONGO_CONNECTION"))
+
+	return migrator.NewMigrator(profileClient, relationsClient, publicationsClient, newsStorage, logger)
 }

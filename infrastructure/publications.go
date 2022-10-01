@@ -10,15 +10,19 @@ import (
 
 type PublicationsClient struct {
 	baseUrl string
+	client  *http.Client
 }
 
-func NewPublicationsClient(baseUrl string) *PublicationsClient {
-	return &PublicationsClient{baseUrl: baseUrl}
+func NewPublicationsClient(baseUrl string, client *http.Client) *PublicationsClient {
+	return &PublicationsClient{
+		baseUrl: baseUrl,
+		client:  client,
+	}
 }
 
 func (c PublicationsClient) GetPublications(cursor string, take int) ([]news.Publication, string, error) {
 	url := fmt.Sprintf("%s/publications?cursor=%s&take=%d", c.baseUrl, cursor, take)
-	resp, err := http.Get(url)
+	resp, err := c.client.Get(url)
 
 	if err != nil {
 		return nil, "", err

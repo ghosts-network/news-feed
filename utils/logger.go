@@ -35,19 +35,16 @@ func (l *Logger) WithValue(key string, value any) *Logger {
 	return NewLoggerWithContext(l.appName, &newScope)
 }
 
-func (l *Logger) Info(message string) *Logger {
+func (l *Logger) Info(message string) {
 	log.Printf("%s %s [INFO] %s %s", time.Now().UTC().Format(time.RFC3339), l.appName, message, asJson(l.scope))
-	return l
 }
 
-func (l *Logger) Debug(message string) *Logger {
+func (l *Logger) Debug(message string) {
 	log.Printf("%s %s [DEBUG] %s %s", time.Now().UTC().Format(time.RFC3339), l.appName, message, asJson(l.scope))
-	return l
 }
 
-func (l *Logger) Error(err error) *Logger {
+func (l *Logger) Error(err error) {
 	log.Printf("%s %s [ERROR] %s %s", time.Now().UTC().Format(time.RFC3339), l.appName, err.Error(), asJson(l.scope))
-	return l
 }
 
 func asJson(d interface{}) []byte {
