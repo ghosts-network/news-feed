@@ -3,13 +3,11 @@ package infrastructure
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/ghosts-network/news-feed/utils"
 	"io/ioutil"
 	"net/http"
 )
 
 type ProfilesClient struct {
-	logger  *utils.Logger
 	client  *http.Client
 	baseUrl string
 }

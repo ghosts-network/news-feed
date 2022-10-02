@@ -2,29 +2,31 @@ package infrastructure
 
 import (
 	"fmt"
-	"github.com/ghosts-network/news-feed/utils"
+	"github.com/ghosts-network/news-feed/utils/logger"
 	"net/http"
 	"time"
 )
 
-func NewScopedClient(logger *utils.Logger) *http.Client {
+func NewScopedClient() *http.Client {
 	return &http.Client{
-		Transport: &LogRoundTripper{logger: logger},
+		Transport: &LogRoundTripper{},
 	}
 }
 
-type LogRoundTripper struct {
-	logger *utils.Logger
-}
+type LogRoundTripper struct{}
 
 func (t LogRoundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
 	st := time.Now()
-	t.logger.Info(fmt.Sprintf("Outgoing http request started %s %s", req.Method, req.URL.String()))
+	logger.Info(fmt.Sprintf("Outgoing http request started %s %s", req.Method, req.URL.String()), &map[string]any{
+		"operationId": req.Context().Value("operationId"),
+	})
+
 	resp, err := http.DefaultTransport.RoundTrip(req)
-	t.logger.
-		WithValue("elapsedMilliseconds", time.Now().Sub(st).Milliseconds()).
-		WithValue("statusCode", resp.StatusCode).
-		Info(fmt.Sprintf("Outgoing http request finished %s %s", req.Method, req.URL.String()))
+	logger.Info(fmt.Sprintf("Outgoing http request finished %s %s", req.Method, req.URL.String()), &map[string]any{
+		"operationId":         req.Context().Value("operationId"),
+		"elapsedMilliseconds": time.Now().Sub(st).Milliseconds(),
+		"statusCode":          resp.StatusCode,
+	})
 
 	return resp, err
 }

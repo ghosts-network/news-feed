@@ -2,8 +2,10 @@ package news
 
 import (
 	"context"
+	"github.com/ghosts-network/news-feed/utils/logger"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
+	"go.mongodb.org/mongo-driver/event"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 	"time"
@@ -18,12 +20,32 @@ type MongoNewsStorage struct {
 func NewMongoNewsStorage(connectionString string) *MongoNewsStorage {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
-	mc, _ := mongo.Connect(ctx, options.Client().ApplyURI(connectionString))
+	mc, _ := mongo.Connect(ctx, options.Client().
+		ApplyURI(connectionString).
+		SetMonitor(&event.CommandMonitor{
+			Started: func(ctx context.Context, event *event.CommandStartedEvent) {
+				logger.Info("Mongodb query started", &map[string]any{
+					"operationId": ctx.Value("operationId"),
+				})
+			},
+			Succeeded: func(ctx context.Context, event *event.CommandSucceededEvent) {
+				logger.Info("Mongodb query finished", &map[string]any{
+					"operationId":         ctx.Value("operationId"),
+					"elapsedMilliseconds": event.DurationNanos / 1000000,
+				})
+			},
+			Failed: func(ctx context.Context, event *event.CommandFailedEvent) {
+				logger.Info("Mongodb query failed", &map[string]any{
+					"operationId":         ctx.Value("operationId"),
+					"elapsedMilliseconds": event.DurationNanos / 1000000,
+				})
+			},
+		}))
 
 	return &MongoNewsStorage{
-		publications: mc.Database("newsfeed2").Collection("publications"),
-		sources:      mc.Database("newsfeed2").Collection("sources"),
-		news:         mc.Database("newsfeed2").Collection("news"),
+		publications: mc.Database("newsfeed").Collection("publications"),
+		sources:      mc.Database("newsfeed").Collection("sources"),
+		news:         mc.Database("newsfeed").Collection("news"),
 	}
 }
 

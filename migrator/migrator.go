@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"github.com/ghosts-network/news-feed/infrastructure"
 	"github.com/ghosts-network/news-feed/news"
-	"github.com/ghosts-network/news-feed/utils"
+	"github.com/ghosts-network/news-feed/utils/logger"
 	"github.com/pkg/errors"
 	"sync"
 	"time"
@@ -16,14 +16,13 @@ type Migrator struct {
 	rc         *infrastructure.RelationsClient
 	pubsClient *infrastructure.PublicationsClient
 	ns         *news.MongoNewsStorage
-	logger     *utils.Logger
 }
 
-func NewMigrator(pc *infrastructure.ProfilesClient, rc *infrastructure.RelationsClient, pubsClient *infrastructure.PublicationsClient, ns *news.MongoNewsStorage, logger *utils.Logger) *Migrator {
-	return &Migrator{pc: pc, rc: rc, pubsClient: pubsClient, ns: ns, logger: logger}
+func NewMigrator(pc *infrastructure.ProfilesClient, rc *infrastructure.RelationsClient, pubsClient *infrastructure.PublicationsClient, ns *news.MongoNewsStorage) *Migrator {
+	return &Migrator{pc: pc, rc: rc, pubsClient: pubsClient, ns: ns}
 }
 
-func (m Migrator) MigrateUsers() {
+func (m Migrator) MigrateUsers(ctx context.Context) {
 	st := time.Now()
 
 	skip := 0
@@ -32,7 +31,9 @@ func (m Migrator) MigrateUsers() {
 	for {
 		ps, err := m.pc.GetProfiles(skip, take)
 		if err != nil {
-			m.logger.Error(err)
+			logger.Error(err, &map[string]any{
+				"operationId": ctx.Value("operationId"),
+			})
 			return
 		}
 
@@ -43,7 +44,7 @@ func (m Migrator) MigrateUsers() {
 		wg := &sync.WaitGroup{}
 		wg.Add(len(ps))
 		for _, profile := range ps {
-			go m.MigrateUserAsync(profile.Id, wg)
+			go m.MigrateUserAsync(ctx, profile.Id, wg)
 		}
 		wg.Wait()
 
@@ -54,44 +55,38 @@ func (m Migrator) MigrateUsers() {
 		skip += take
 	}
 
-	m.logger.
-		WithValue("elapsedMilliseconds", time.Now().Sub(st).Milliseconds()).
-		Info("Users migration finished")
+	logger.Info("Users migration finished", &map[string]any{
+		"operationId":         ctx.Value("operationId"),
+		"elapsedMilliseconds": time.Now().Sub(st).Milliseconds(),
+	})
 }
 
-func (m Migrator) MigrateUser(user string) {
+func (m Migrator) MigrateUser(ctx context.Context, user string) {
 	st := time.Now()
-
-	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Minute)
-	defer cancel()
 
 	_ = m.ns.RemoveUserSources(ctx, user)
 	m.migrateFriends(ctx, user)
 	m.migrateOutgoingRequests(ctx, user)
 
-	m.logger.
-		WithValue("elapsedMilliseconds", time.Now().Sub(st).Milliseconds()).
-		Info(fmt.Sprintf("User %s migration finished", user))
+	logger.Info(fmt.Sprintf("User %s migration finished", user), &map[string]any{
+		"operationId":         ctx.Value("operationId"),
+		"elapsedMilliseconds": time.Now().Sub(st).Milliseconds(),
+	})
 }
 
-func (m Migrator) MigrateUserAsync(user string, wg *sync.WaitGroup) {
-	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Minute)
-	defer cancel()
-
+func (m Migrator) MigrateUserAsync(ctx context.Context, user string, wg *sync.WaitGroup) {
 	_ = m.ns.RemoveUserSources(ctx, user)
 	m.migrateFriends(ctx, user)
 	m.migrateOutgoingRequests(ctx, user)
 	wg.Done()
 
-	m.logger.
-		Debug(fmt.Sprintf("User %s migration finished", user))
+	logger.Debug(fmt.Sprintf("User %s migration finished", user), &map[string]any{
+		"operationId": ctx.Value("operationId"),
+	})
 }
 
-func (m Migrator) MigratePublications() {
+func (m Migrator) MigratePublications(ctx context.Context) {
 	st := time.Now()
-
-	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Minute)
-	defer cancel()
 	_ = m.ns.RemoveAllNews(ctx)
 
 	var cursor string
@@ -100,7 +95,9 @@ func (m Migrator) MigratePublications() {
 	for {
 		ps, nextCursor, err := m.pubsClient.GetPublications(cursor, take)
 		if err != nil {
-			m.logger.Error(errors.Wrap(err, fmt.Sprintf("Failed to fetch publications with cursor: %s, count: %d", cursor, take)))
+			logger.Error(errors.Wrap(err, fmt.Sprintf("Failed to fetch publications with cursor: %s, count: %d", cursor, take)), &map[string]any{
+				"operationId": ctx.Value("operationId"),
+			})
 			return
 		}
 
@@ -112,9 +109,13 @@ func (m Migrator) MigratePublications() {
 			err = m.ns.AddPublication(ctx, &publication)
 
 			if err != nil {
-				m.logger.Error(errors.Wrap(err, fmt.Sprintf("Failed to migrate publication %s", publication.Id)))
+				logger.Error(errors.Wrap(err, fmt.Sprintf("Failed to migrate publication %s", publication.Id)), &map[string]any{
+					"operationId": ctx.Value("operationId"),
+				})
 			} else {
-				m.logger.Debug(fmt.Sprintf("Publication %s migrated", publication.Id))
+				logger.Debug(fmt.Sprintf("Publication %s migrated", publication.Id), &map[string]any{
+					"operationId": ctx.Value("operationId"),
+				})
 			}
 		}
 
@@ -125,9 +126,10 @@ func (m Migrator) MigratePublications() {
 		cursor = nextCursor
 	}
 
-	m.logger.
-		WithValue("elapsedMilliseconds", time.Now().Sub(st).Milliseconds()).
-		Info("Publications migration finished")
+	logger.Info("Publications migration finished", &map[string]any{
+		"operationId":         ctx.Value("operationId"),
+		"elapsedMilliseconds": time.Now().Sub(st).Milliseconds(),
+	})
 }
 
 func (m Migrator) migrateFriends(ctx context.Context, user string) {
@@ -137,7 +139,9 @@ func (m Migrator) migrateFriends(ctx context.Context, user string) {
 	for {
 		friends, err := m.rc.GetFriends(user, skip, take)
 		if err != nil {
-			m.logger.Error(errors.Wrap(err, fmt.Sprintf("Failed to fetch friends for %s with skip: %d, count: %d", user, skip, take)))
+			logger.Error(errors.Wrap(err, fmt.Sprintf("Failed to fetch friends for %s with skip: %d, count: %d", user, skip, take)), &map[string]any{
+				"operationId": ctx.Value("operationId"),
+			})
 			return
 		}
 
@@ -148,9 +152,13 @@ func (m Migrator) migrateFriends(ctx context.Context, user string) {
 		for _, friend := range friends {
 			err := m.ns.AddUserSource(ctx, user, friend)
 			if err != nil {
-				m.logger.Error(errors.Wrap(err, fmt.Sprintf("Failed to migrate friend %s for %s", friend, user)))
+				logger.Error(errors.Wrap(err, fmt.Sprintf("Failed to migrate friend %s for %s", friend, user)), &map[string]any{
+					"operationId": ctx.Value("operationId"),
+				})
 			} else {
-				m.logger.Debug(fmt.Sprintf("Friend %s for %s migrated", friend, user))
+				logger.Debug(fmt.Sprintf("Friend %s for %s migrated", friend, user), &map[string]any{
+					"operationId": ctx.Value("operationId"),
+				})
 			}
 		}
 
@@ -168,7 +176,9 @@ func (m Migrator) migrateOutgoingRequests(ctx context.Context, user string) {
 	for {
 		rs, err := m.rc.GetOutgoingRequests(user, skip, take)
 		if err != nil {
-			m.logger.Error(errors.Wrap(err, fmt.Sprintf("Failed to fetch outgoing requests for %s with skip: %d, count: %d", user, skip, take)))
+			logger.Error(errors.Wrap(err, fmt.Sprintf("Failed to fetch outgoing requests for %s with skip: %d, count: %d", user, skip, take)), &map[string]any{
+				"operationId": ctx.Value("operationId"),
+			})
 			return
 		}
 
@@ -179,9 +189,13 @@ func (m Migrator) migrateOutgoingRequests(ctx context.Context, user string) {
 		for _, r := range rs {
 			err := m.ns.AddUserSource(ctx, user, r)
 			if err != nil {
-				m.logger.Error(errors.Wrap(err, fmt.Sprintf("Failed to migrate outgoing request from %s to %s", user, r)))
+				logger.Error(errors.Wrap(err, fmt.Sprintf("Failed to migrate outgoing request from %s to %s", user, r)), &map[string]any{
+					"operationId": ctx.Value("operationId"),
+				})
 			} else {
-				m.logger.Debug(fmt.Sprintf("Outgoing request from %s to %s migrated", user, r))
+				logger.Debug(fmt.Sprintf("Outgoing request from %s to %s migrated", user, r), &map[string]any{
+					"operationId": ctx.Value("operationId"),
+				})
 			}
 		}
 

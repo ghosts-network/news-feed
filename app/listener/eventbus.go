@@ -4,21 +4,17 @@ import (
 	"context"
 	"fmt"
 	"github.com/Azure/azure-sdk-for-go/sdk/messaging/azservicebus"
-	"github.com/ghosts-network/news-feed/utils"
+	"github.com/ghosts-network/news-feed/utils/logger"
 	"github.com/pkg/errors"
 	"time"
 )
 
 type EventBus struct {
 	client *azservicebus.Client
-	logger *utils.Logger
 }
 
-func NewEventBus(client *azservicebus.Client, logger *utils.Logger) *EventBus {
-	return &EventBus{
-		client: client,
-		logger: logger,
-	}
+func NewEventBus(client *azservicebus.Client) *EventBus {
+	return &EventBus{client: client}
 }
 
 func (eb EventBus) ListenOne(ctx context.Context, topicName string, subscriptionName string, handler func(*azservicebus.ReceivedMessage) error) error {
@@ -33,22 +29,22 @@ func (eb EventBus) ListenOne(ctx context.Context, topicName string, subscription
 			for _, message := range messages {
 				st := time.Now()
 
-				scopedLogger := eb.logger.
-					WithValue("operationId", message.CorrelationID).
-					WithValue("messageId", message.MessageID).
-					WithValue("topic", topicName).
-					Info(fmt.Sprintf("Message %s processing started", message.MessageID))
+				scope := map[string]any{
+					"operationId": message.CorrelationID,
+					"messageId":   message.MessageID,
+					"topic":       topicName,
+				}
 
-				if err := handler(message); err != nil {
+				logger.Info(fmt.Sprintf("Message %s processing started", message.MessageID), &scope)
+				err := handler(message)
+				scope["elapsedMilliseconds"] = time.Now().Sub(st).Milliseconds()
+
+				if err != nil {
 					_ = receiver.AbandonMessage(ctx, message, nil)
-					scopedLogger.
-						WithValue("elapsedMilliseconds", time.Now().Sub(st).Milliseconds()).
-						Error(errors.Wrap(err, fmt.Sprintf("Message %s abandoned", message.MessageID)))
+					logger.Error(errors.Wrap(err, fmt.Sprintf("Message %s abandoned", message.MessageID)), &scope)
 				} else {
 					_ = receiver.CompleteMessage(ctx, message, nil)
-					scopedLogger.
-						WithValue("elapsedMilliseconds", time.Now().Sub(st).Milliseconds()).
-						Info(fmt.Sprintf("Message %s abandoned", message.MessageID))
+					logger.Info(fmt.Sprintf("Message %s abandoned", message.MessageID), &scope)
 				}
 			}
 		}

@@ -7,7 +7,7 @@ import (
 	"github.com/ghosts-network/news-feed/infrastructure"
 	"github.com/ghosts-network/news-feed/migrator"
 	"github.com/ghosts-network/news-feed/news"
-	"github.com/ghosts-network/news-feed/utils"
+	"github.com/ghosts-network/news-feed/utils/logger"
 	"github.com/google/uuid"
 	"github.com/gorilla/mux"
 	"github.com/pkg/errors"
@@ -17,15 +17,13 @@ import (
 	"time"
 )
 
-var log *utils.Logger
-
 func main() {
-	log = utils.NewLogger("news-feed-api")
+	logger.ApplicationName = "news-feed-api"
+
 	newsStorage := news.NewMongoNewsStorage(os.Getenv("MONGO_CONNECTION"))
 
 	r := mux.NewRouter()
 	r.HandleFunc("/{user}", func(w http.ResponseWriter, r *http.Request) {
-		l := r.Context().Value("logger").(*utils.Logger)
 		user := mux.Vars(r)["user"]
 		cursor := r.URL.Query().Get("cursor")
 		take, _ := strconv.Atoi(r.URL.Query().Get("take"))
@@ -33,12 +31,11 @@ func main() {
 			take = 20
 		}
 
-		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-		defer cancel()
-
-		ps, err := newsStorage.FindNews(ctx, user, cursor, take)
+		ps, err := newsStorage.FindNews(r.Context(), user, cursor, take)
 		if err != nil {
-			l.Error(errors.Wrap(err, fmt.Sprintf("Failed to fetch news")))
+			logger.Error(errors.Wrap(err, fmt.Sprintf("Failed to fetch news")), &map[string]any{
+				"operationId": r.Context().Value("operationId"),
+			})
 			w.WriteHeader(http.StatusInternalServerError)
 			_, _ = w.Write([]byte(err.Error()))
 			return
@@ -46,7 +43,9 @@ func main() {
 
 		body, err := json.Marshal(ps)
 		if err != nil {
-			l.Error(errors.Wrap(err, fmt.Sprintf("Failed to marshal news")))
+			logger.Error(errors.Wrap(err, fmt.Sprintf("Failed to marshal news")), &map[string]any{
+				"operationId": r.Context().Value("operationId"),
+			})
 			w.WriteHeader(http.StatusInternalServerError)
 			_, _ = w.Write([]byte(err.Error()))
 			return
@@ -60,30 +59,34 @@ func main() {
 	}).Methods(http.MethodGet)
 
 	r.HandleFunc("/migrator/users", func(w http.ResponseWriter, r *http.Request) {
-		go getMigrator(r.Context().Value("logger").(*utils.Logger)).
-			MigrateUsers()
+		getMigrator().
+			MigrateUsers(r.Context())
+
 		w.WriteHeader(http.StatusAccepted)
 	}).Methods(http.MethodPost)
 
 	r.HandleFunc("/migrator/users/{user}", func(w http.ResponseWriter, r *http.Request) {
 		user := mux.Vars(r)["user"]
-		go getMigrator(r.Context().Value("logger").(*utils.Logger)).
-			MigrateUser(user)
-		w.WriteHeader(http.StatusAccepted)
+
+		getMigrator().
+			MigrateUser(r.Context(), user)
+
+		w.WriteHeader(http.StatusOK)
 	}).Methods(http.MethodPost)
 
 	r.HandleFunc("/migrator/publications", func(w http.ResponseWriter, r *http.Request) {
-		go getMigrator(r.Context().Value("logger").(*utils.Logger)).
-			MigratePublications()
-		w.WriteHeader(http.StatusAccepted)
+		getMigrator().
+			MigratePublications(r.Context())
+
+		w.WriteHeader(http.StatusOK)
 	}).Methods(http.MethodPost)
 
 	r.Use(scopedLoggerMiddleware)
 	r.Use(loggingMiddleware)
 	r.Use(setJsonContentType)
 
-	log.Info("Starting http server on port 10000")
-	log.Error(http.ListenAndServe(":10000", r))
+	logger.Info("Starting http server on port 10000", &map[string]any{})
+	logger.Error(http.ListenAndServe(":10000", r), &map[string]any{})
 }
 
 func scopedLoggerMiddleware(next http.Handler) http.Handler {
@@ -93,7 +96,7 @@ func scopedLoggerMiddleware(next http.Handler) http.Handler {
 			id = uuid.NewString()
 		}
 
-		newContext := context.WithValue(r.Context(), "logger", log.WithValue("operationId", id))
+		newContext := context.WithValue(r.Context(), "operationId", id)
 		next.ServeHTTP(w, r.WithContext(newContext))
 	})
 }
@@ -101,18 +104,19 @@ func scopedLoggerMiddleware(next http.Handler) http.Handler {
 func loggingMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		st := time.Now()
-		scopedLog := r.Context().Value("logger").(*utils.Logger)
 
-		scopedLog.
-			Info(fmt.Sprintf("%s %s request started", r.Method, r.RequestURI))
+		logger.Info(fmt.Sprintf("%s %s request started", r.Method, r.RequestURI), &map[string]any{
+			"operationId": r.Context().Value("operationId"),
+		})
 
 		sw := NewStatusWriter(w)
 		next.ServeHTTP(sw, r)
 
-		scopedLog.
-			WithValue("statusCode", sw.Status).
-			WithValue("elapsedMilliseconds", time.Now().Sub(st).Milliseconds()).
-			Info(fmt.Sprintf("%s %s request finished", r.Method, r.RequestURI))
+		logger.Info(fmt.Sprintf("%s %s request finished", r.Method, r.RequestURI), &map[string]any{
+			"operationId":         r.Context().Value("operationId"),
+			"statusCode":          sw.Status,
+			"elapsedMilliseconds": time.Now().Sub(st).Milliseconds(),
+		})
 	})
 }
 
@@ -140,13 +144,13 @@ func (w *StatusWriter) WriteHeader(status int) {
 	w.ResponseWriter.WriteHeader(status)
 }
 
-func getMigrator(logger *utils.Logger) *migrator.Migrator {
-	httpClient := infrastructure.NewScopedClient(logger)
+func getMigrator() *migrator.Migrator {
+	httpClient := infrastructure.NewScopedClient()
 
 	profileClient := infrastructure.NewProfilesClient(os.Getenv("PROFILES_ADDRESS"), httpClient)
 	relationsClient := infrastructure.NewRelationsClient(os.Getenv("PROFILES_ADDRESS"), httpClient)
 	publicationsClient := infrastructure.NewPublicationsClient(os.Getenv("CONTENT_ADDRESS"), httpClient)
 	newsStorage := news.NewMongoNewsStorage(os.Getenv("MONGO_CONNECTION"))
 
-	return migrator.NewMigrator(profileClient, relationsClient, publicationsClient, newsStorage, logger)
+	return migrator.NewMigrator(profileClient, relationsClient, publicationsClient, newsStorage)
 }
