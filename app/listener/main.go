@@ -22,18 +22,18 @@ func main() {
 	storage := news.NewMongoNewsStorage(os.Getenv("MONGO_CONNECTION"))
 	eventbus := configureEventBus(os.Getenv("SERVICEBUS_CONNECTION"))
 
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
+	ctx := context.Background()
 
-	err := eventbus.ListenOne(ctx, "ghostnetwork.content.publications.created", subscriptionName, func(message *azservicebus.ReceivedMessage) error {
+	err := eventbus.ListenOne(ctx, "ghostnetwork.content.publications.created", subscriptionName, func(ctx context.Context, message *azservicebus.ReceivedMessage) error {
 		var model news.Publication
 		err := json.Unmarshal(message.Body, &model)
 		if err != nil {
 			return err
 		}
 
-		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
 		defer cancel()
+
 		err = storage.AddPublication(ctx, &model)
 		if err != nil {
 			return err
@@ -47,14 +47,14 @@ func main() {
 		logger.Info(fmt.Sprintf("Successfully subscribed to topic ghostnetwork.content.publications.created"), &map[string]any{})
 	}
 
-	err = eventbus.ListenOne(ctx, "ghostnetwork.content.publications.updated", subscriptionName, func(message *azservicebus.ReceivedMessage) error {
+	err = eventbus.ListenOne(ctx, "ghostnetwork.content.publications.updated", subscriptionName, func(ctx context.Context, message *azservicebus.ReceivedMessage) error {
 		var model news.Publication
 		err := json.Unmarshal(message.Body, &model)
 		if err != nil {
 			return err
 		}
 
-		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
 		defer cancel()
 
 		return storage.UpdatePublication(ctx, &model)
@@ -65,14 +65,14 @@ func main() {
 		logger.Info(fmt.Sprintf("Successfully subscribed to topic ghostnetwork.content.publications.updated"), &map[string]any{})
 	}
 
-	err = eventbus.ListenOne(ctx, "ghostnetwork.content.publications.deleted", subscriptionName, func(message *azservicebus.ReceivedMessage) error {
+	err = eventbus.ListenOne(ctx, "ghostnetwork.content.publications.deleted", subscriptionName, func(ctx context.Context, message *azservicebus.ReceivedMessage) error {
 		var model news.Publication
 		err := json.Unmarshal(message.Body, &model)
 		if err != nil {
 			return err
 		}
 
-		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
 		defer cancel()
 		return storage.RemovePublication(ctx, &model)
 	})
@@ -82,14 +82,14 @@ func main() {
 		logger.Info(fmt.Sprintf("Successfully subscribed to topic ghostnetwork.content.publications.deleted"), &map[string]any{})
 	}
 
-	err = eventbus.ListenOne(ctx, "ghostnetwork.profiles.friends.requestsent", subscriptionName, func(message *azservicebus.ReceivedMessage) error {
+	err = eventbus.ListenOne(ctx, "ghostnetwork.profiles.friends.requestsent", subscriptionName, func(ctx context.Context, message *azservicebus.ReceivedMessage) error {
 		var model RequestSent
 		err := json.Unmarshal(message.Body, &model)
 		if err != nil {
 			return err
 		}
 
-		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
 		defer cancel()
 
 		return storage.AddUserSource(ctx, model.FromUser, model.ToUser)
@@ -100,14 +100,14 @@ func main() {
 		logger.Info(fmt.Sprintf("Successfully subscribed to topic ghostnetwork.profiles.friends.requestsent"), &map[string]any{})
 	}
 
-	err = eventbus.ListenOne(ctx, "ghostnetwork.profiles.friends.requestcancelled", subscriptionName, func(message *azservicebus.ReceivedMessage) error {
+	err = eventbus.ListenOne(ctx, "ghostnetwork.profiles.friends.requestcancelled", subscriptionName, func(ctx context.Context, message *azservicebus.ReceivedMessage) error {
 		var model RequestCancelled
 		err := json.Unmarshal(message.Body, &model)
 		if err != nil {
 			return err
 		}
 
-		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
 		defer cancel()
 
 		return storage.RemoveUserSource(ctx, model.FromUser, model.ToUser)
@@ -118,14 +118,14 @@ func main() {
 		logger.Info(fmt.Sprintf("Successfully subscribed to topic ghostnetwork.profiles.friends.requestcancelled"), &map[string]any{})
 	}
 
-	err = eventbus.ListenOne(ctx, "ghostnetwork.profiles.friends.requestapproved", subscriptionName, func(message *azservicebus.ReceivedMessage) error {
+	err = eventbus.ListenOne(ctx, "ghostnetwork.profiles.friends.requestapproved", subscriptionName, func(ctx context.Context, message *azservicebus.ReceivedMessage) error {
 		var model RequestApproved
 		err := json.Unmarshal(message.Body, &model)
 		if err != nil {
 			return err
 		}
 
-		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
 		defer cancel()
 
 		return storage.AddUserSource(ctx, model.User, model.Requester)
@@ -136,7 +136,7 @@ func main() {
 		logger.Info(fmt.Sprintf("Successfully subscribed to topic ghostnetwork.profiles.friends.requestapproved"), &map[string]any{})
 	}
 
-	err = eventbus.ListenOne(ctx, "ghostnetwork.profiles.friends.deleted", subscriptionName, func(message *azservicebus.ReceivedMessage) error {
+	err = eventbus.ListenOne(ctx, "ghostnetwork.profiles.friends.deleted", subscriptionName, func(ctx context.Context, message *azservicebus.ReceivedMessage) error {
 		var model Deleted
 		err := json.Unmarshal(message.Body, &model)
 		if err != nil {
@@ -161,7 +161,6 @@ func main() {
 		syscall.SIGTERM,
 		syscall.SIGQUIT)
 	<-sigc
-	cancel()
 }
 
 func configureEventBus(connectionString string) *EventBus {

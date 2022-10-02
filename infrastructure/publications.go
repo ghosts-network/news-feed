@@ -1,6 +1,7 @@
 package infrastructure
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"github.com/ghosts-network/news-feed/news"
@@ -20,9 +21,16 @@ func NewPublicationsClient(baseUrl string, client *http.Client) *PublicationsCli
 	}
 }
 
-func (c PublicationsClient) GetPublications(cursor string, take int) ([]news.Publication, string, error) {
+func (c PublicationsClient) GetPublications(ctx context.Context, cursor string, take int) ([]news.Publication, string, error) {
 	url := fmt.Sprintf("%s/publications?cursor=%s&take=%d", c.baseUrl, cursor, take)
-	resp, err := c.client.Get(url)
+	req, err := http.NewRequest(http.MethodGet, url, nil)
+	if err != nil {
+		return nil, "", err
+	}
+
+	req = req.WithContext(ctx)
+
+	resp, err := c.client.Do(req)
 
 	if err != nil {
 		return nil, "", err

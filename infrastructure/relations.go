@@ -1,6 +1,7 @@
 package infrastructure
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
@@ -16,9 +17,16 @@ func NewRelationsClient(baseUrl string, client *http.Client) *RelationsClient {
 	return &RelationsClient{baseUrl: baseUrl, client: client}
 }
 
-func (c RelationsClient) GetFriends(user string, skip int, take int) ([]string, error) {
+func (c RelationsClient) GetFriends(ctx context.Context, user string, skip int, take int) ([]string, error) {
 	url := fmt.Sprintf("%s/relations/%s/friends?skip=%d&take=%d", c.baseUrl, user, skip, take)
-	resp, err := c.client.Get(url)
+	req, err := http.NewRequest(http.MethodGet, url, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	req = req.WithContext(ctx)
+
+	resp, err := c.client.Do(req)
 
 	if err != nil {
 		return nil, err
@@ -36,9 +44,16 @@ func (c RelationsClient) GetFriends(user string, skip int, take int) ([]string, 
 	return ids, err
 }
 
-func (c RelationsClient) GetOutgoingRequests(user string, skip int, take int) ([]string, error) {
+func (c RelationsClient) GetOutgoingRequests(ctx context.Context, user string, skip int, take int) ([]string, error) {
 	url := fmt.Sprintf("%s/relations/%s/friends/outgoing-requests?skip=%d&take=%d", c.baseUrl, user, skip, take)
-	resp, err := http.Get(url)
+	req, err := http.NewRequest(http.MethodGet, url, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	req = req.WithContext(ctx)
+
+	resp, err := c.client.Do(req)
 
 	if err != nil {
 		return nil, err

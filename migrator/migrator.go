@@ -29,7 +29,7 @@ func (m Migrator) MigrateUsers(ctx context.Context) {
 	take := 20
 
 	for {
-		ps, err := m.pc.GetProfiles(skip, take)
+		ps, err := m.pc.GetProfiles(ctx, skip, take)
 		if err != nil {
 			logger.Error(err, &map[string]any{
 				"operationId": ctx.Value("operationId"),
@@ -93,7 +93,7 @@ func (m Migrator) MigratePublications(ctx context.Context) {
 	take := 20
 
 	for {
-		ps, nextCursor, err := m.pubsClient.GetPublications(cursor, take)
+		ps, nextCursor, err := m.pubsClient.GetPublications(ctx, cursor, take)
 		if err != nil {
 			logger.Error(errors.Wrap(err, fmt.Sprintf("Failed to fetch publications with cursor: %s, count: %d", cursor, take)), &map[string]any{
 				"operationId": ctx.Value("operationId"),
@@ -137,7 +137,7 @@ func (m Migrator) migrateFriends(ctx context.Context, user string) {
 	take := 20
 
 	for {
-		friends, err := m.rc.GetFriends(user, skip, take)
+		friends, err := m.rc.GetFriends(ctx, user, skip, take)
 		if err != nil {
 			logger.Error(errors.Wrap(err, fmt.Sprintf("Failed to fetch friends for %s with skip: %d, count: %d", user, skip, take)), &map[string]any{
 				"operationId": ctx.Value("operationId"),
@@ -174,7 +174,7 @@ func (m Migrator) migrateOutgoingRequests(ctx context.Context, user string) {
 	take := 20
 
 	for {
-		rs, err := m.rc.GetOutgoingRequests(user, skip, take)
+		rs, err := m.rc.GetOutgoingRequests(ctx, user, skip, take)
 		if err != nil {
 			logger.Error(errors.Wrap(err, fmt.Sprintf("Failed to fetch outgoing requests for %s with skip: %d, count: %d", user, skip, take)), &map[string]any{
 				"operationId": ctx.Value("operationId"),

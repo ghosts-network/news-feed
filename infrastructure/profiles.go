@@ -1,6 +1,7 @@
 package infrastructure
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
@@ -19,9 +20,16 @@ func NewProfilesClient(baseUrl string, client *http.Client) *ProfilesClient {
 	}
 }
 
-func (c ProfilesClient) GetProfiles(skip int, take int) ([]Profile, error) {
+func (c ProfilesClient) GetProfiles(ctx context.Context, skip int, take int) ([]Profile, error) {
 	url := fmt.Sprintf("%s/profiles?skip=%d&take=%d", c.baseUrl, skip, take)
-	resp, err := c.client.Get(url)
+	req, err := http.NewRequest(http.MethodGet, url, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	req = req.WithContext(ctx)
+
+	resp, err := c.client.Do(req)
 
 	if err != nil {
 		return nil, err
