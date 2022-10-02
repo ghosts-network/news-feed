@@ -46,12 +46,10 @@ func (c RelationsClient) GetFriends(ctx context.Context, user string, skip int, 
 
 func (c RelationsClient) GetOutgoingRequests(ctx context.Context, user string, skip int, take int) ([]string, error) {
 	url := fmt.Sprintf("%s/relations/%s/friends/outgoing-requests?skip=%d&take=%d", c.baseUrl, user, skip, take)
-	req, err := http.NewRequest(http.MethodGet, url, nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
 		return nil, err
 	}
-
-	req = req.WithContext(ctx)
 
 	resp, err := c.client.Do(req)
 
