@@ -39,7 +39,7 @@ func (c ProfilesClient) GetProfiles(ctx context.Context, skip int, take int) ([]
 		return nil, err
 	}
 
-	ps := make([]Profile, take)
+	ps := make([]Profile, 0, take)
 	err = json.Unmarshal(rb, &ps)
 
 	return ps, err

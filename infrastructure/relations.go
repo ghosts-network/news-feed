@@ -63,7 +63,7 @@ func (c RelationsClient) GetOutgoingRequests(ctx context.Context, user string, s
 		return nil, err
 	}
 
-	ids := make([]string, take)
+	ids := make([]string, 0, take)
 	err = json.Unmarshal(rb, &ids)
 
 	return ids, err

@@ -34,12 +34,7 @@ func main() {
 		ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
 		defer cancel()
 
-		err = storage.AddPublication(ctx, &model)
-		if err != nil {
-			return err
-		}
-
-		return nil
+		return storage.AddPublication(ctx, &model)
 	})
 	if err != nil {
 		logger.Error(errors.Wrap(err, "Failed to subscribe on ghostnetwork.content.publications.created"), &map[string]any{})

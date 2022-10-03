@@ -26,7 +26,7 @@ func (m Migrator) MigrateUsers(ctx context.Context) {
 	st := time.Now()
 
 	skip := 0
-	take := 20
+	take := 100
 
 	for {
 		ps, err := m.pc.GetProfiles(ctx, skip, take)
@@ -87,10 +87,10 @@ func (m Migrator) MigrateUserAsync(ctx context.Context, user string, wg *sync.Wa
 
 func (m Migrator) MigratePublications(ctx context.Context) {
 	st := time.Now()
-	_ = m.ns.RemoveAllNews(ctx)
+	_ = m.ns.RemovePublications(ctx)
 
 	var cursor string
-	take := 20
+	take := 100
 
 	for {
 		ps, nextCursor, err := m.pubsClient.GetPublications(ctx, cursor, take)
@@ -105,18 +105,14 @@ func (m Migrator) MigratePublications(ctx context.Context) {
 			break
 		}
 
-		for _, publication := range ps {
-			err = m.ns.AddPublication(ctx, &publication)
-
-			if err != nil {
-				logger.Error(errors.Wrap(err, fmt.Sprintf("Failed to migrate publication %s", publication.Id)), &map[string]any{
-					"operationId": ctx.Value("operationId"),
-				})
-			} else {
-				logger.Debug(fmt.Sprintf("Publication %s migrated", publication.Id), &map[string]any{
-					"operationId": ctx.Value("operationId"),
-				})
-			}
+		if err = m.ns.AddPublications(ctx, ps); err != nil {
+			logger.Error(errors.Wrap(err, fmt.Sprintf("Failed to migrate publications batch (%s, %d)", cursor, take)), &map[string]any{
+				"operationId": ctx.Value("operationId"),
+			})
+		} else {
+			logger.Debug(fmt.Sprintf("Publications batch (%s, %d) migrated", cursor, take), &map[string]any{
+				"operationId": ctx.Value("operationId"),
+			})
 		}
 
 		if len(ps) < take {
@@ -134,7 +130,7 @@ func (m Migrator) MigratePublications(ctx context.Context) {
 
 func (m Migrator) migrateFriends(ctx context.Context, user string) {
 	skip := 0
-	take := 20
+	take := 100
 
 	for {
 		friends, err := m.rc.GetFriends(ctx, user, skip, take)
@@ -149,17 +145,14 @@ func (m Migrator) migrateFriends(ctx context.Context, user string) {
 			break
 		}
 
-		for _, friend := range friends {
-			err := m.ns.AddUserSource(ctx, user, friend)
-			if err != nil {
-				logger.Error(errors.Wrap(err, fmt.Sprintf("Failed to migrate friend %s for %s", friend, user)), &map[string]any{
-					"operationId": ctx.Value("operationId"),
-				})
-			} else {
-				logger.Debug(fmt.Sprintf("Friend %s for %s migrated", friend, user), &map[string]any{
-					"operationId": ctx.Value("operationId"),
-				})
-			}
+		if err = m.ns.AddUserSources(ctx, user, friends); err != nil {
+			logger.Error(errors.Wrap(err, fmt.Sprintf("Failed to migrate friends batch (%d, %d) for %s", skip, take, user)), &map[string]any{
+				"operationId": ctx.Value("operationId"),
+			})
+		} else {
+			logger.Debug(fmt.Sprintf("Friends batch (%d, %d) for %s migrated", skip, take, user), &map[string]any{
+				"operationId": ctx.Value("operationId"),
+			})
 		}
 
 		if len(friends) < take {
@@ -171,7 +164,7 @@ func (m Migrator) migrateFriends(ctx context.Context, user string) {
 
 func (m Migrator) migrateOutgoingRequests(ctx context.Context, user string) {
 	skip := 0
-	take := 20
+	take := 100
 
 	for {
 		rs, err := m.rc.GetOutgoingRequests(ctx, user, skip, take)
@@ -186,17 +179,14 @@ func (m Migrator) migrateOutgoingRequests(ctx context.Context, user string) {
 			break
 		}
 
-		for _, r := range rs {
-			err := m.ns.AddUserSource(ctx, user, r)
-			if err != nil {
-				logger.Error(errors.Wrap(err, fmt.Sprintf("Failed to migrate outgoing request from %s to %s", user, r)), &map[string]any{
-					"operationId": ctx.Value("operationId"),
-				})
-			} else {
-				logger.Debug(fmt.Sprintf("Outgoing request from %s to %s migrated", user, r), &map[string]any{
-					"operationId": ctx.Value("operationId"),
-				})
-			}
+		if err = m.ns.AddUserSources(ctx, user, rs); err != nil {
+			logger.Error(errors.Wrap(err, fmt.Sprintf("Failed to migrate outgoing requests batch (%d, %d) for %s", skip, take, user)), &map[string]any{
+				"operationId": ctx.Value("operationId"),
+			})
+		} else {
+			logger.Debug(fmt.Sprintf("Outgoing request batch (%d, %d) for %s migrated", skip, take, user), &map[string]any{
+				"operationId": ctx.Value("operationId"),
+			})
 		}
 
 		if len(rs) < take {

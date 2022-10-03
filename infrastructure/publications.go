@@ -40,7 +40,7 @@ func (c PublicationsClient) GetPublications(ctx context.Context, cursor string, 
 		return nil, "", err
 	}
 
-	ps := make([]news.Publication, take)
+	ps := make([]news.Publication, 0, take)
 	err = json.Unmarshal(rb, &ps)
 
 	nextCursor := resp.Header.Get("X-Cursor")

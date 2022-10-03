@@ -49,6 +49,44 @@ func NewMongoNewsStorage(connectionString string) *MongoNewsStorage {
 	}
 }
 
+func (storage *MongoNewsStorage) AddUserSources(ctx context.Context, user string, sources []string) error {
+	documents := make([]any, 0, len(sources))
+	for _, source := range sources {
+		documents = append(documents, bson.D{
+			{"user", user},
+			{"source", source},
+		})
+	}
+
+	_, err := storage.sources.InsertMany(ctx, documents)
+	if err != nil {
+		return err
+	}
+
+	for _, source := range sources {
+		ps, err := storage.findPublications(ctx, source)
+		var news []interface{}
+		for _, p := range ps {
+			news = append(news, newsStruct{
+				PublicationId: p.Id,
+				Source:        source,
+				User:          user,
+				Order:         p.CreatedOn,
+			})
+		}
+
+		if err != nil {
+			return err
+		}
+
+		if len(news) > 0 {
+			_, err = storage.news.InsertMany(ctx, news)
+		}
+	}
+
+	return nil
+}
+
 func (storage *MongoNewsStorage) AddUserSource(ctx context.Context, user string, source string) error {
 	d := bson.D{
 		{"user", user},
@@ -80,30 +118,19 @@ func (storage *MongoNewsStorage) AddUserSource(ctx context.Context, user string,
 }
 
 func (storage *MongoNewsStorage) RemoveUserSource(ctx context.Context, user string, source string) error {
-	f := bson.D{{"user", user}, {"source", source}}
-	_, err := storage.sources.DeleteOne(ctx, f)
+	_, err := storage.sources.DeleteOne(ctx, bson.D{{"user", user}, {"source", source}})
 	if err != nil {
 		return err
 	}
 
-	// remove publications from source from news feed
-	f = bson.D{{"user", user}, {"source", source}}
-	_, err = storage.news.DeleteMany(ctx, f)
+	_, err = storage.news.DeleteMany(ctx, bson.D{{"user", user}, {"source", source}})
 
 	return err
 }
 
-func (storage *MongoNewsStorage) RemoveAllNews(ctx context.Context) error {
+func (storage *MongoNewsStorage) RemovePublications(ctx context.Context) error {
 	_, err := storage.publications.DeleteMany(ctx, bson.D{})
-	if err != nil {
-		return err
-	}
-	_, err = storage.news.DeleteMany(ctx, bson.D{})
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return err
 }
 
 func (storage *MongoNewsStorage) RemoveUserSources(ctx context.Context, user string) (err error) {
@@ -160,6 +187,67 @@ func (storage *MongoNewsStorage) AddPublication(ctx context.Context, p *Publicat
 	return err
 }
 
+func (storage *MongoNewsStorage) AddPublications(ctx context.Context, publications []Publication) error {
+	ps := make([]any, 0, len(publications))
+	for _, p := range publications {
+		oId, err := primitive.ObjectIDFromHex(p.Id)
+		if err != nil {
+			return err
+		}
+
+		ps = append(ps, publicationStruct{
+			Id:        oId,
+			Content:   p.Content,
+			Author:    p.Author,
+			CreatedOn: p.CreatedOn.UnixMilli(),
+			UpdatedOn: p.UpdatedOn.UnixMilli(),
+			Media:     p.Media,
+		})
+	}
+
+	_, err := storage.publications.InsertMany(ctx, ps)
+
+	//for _, p := range publications {
+	//	oId, _ := primitive.ObjectIDFromHex(p.Id)
+	//	f := bson.D{{"source", p.Author.Id}}
+	//	cur, err := storage.sources.Find(ctx, f)
+	//	if err != nil {
+	//		return err
+	//	}
+	//
+	//	var news []interface{}
+	//	for cur.Next(ctx) {
+	//		var result sourceStruct
+	//		err := cur.Decode(&result)
+	//		if err != nil {
+	//			return err
+	//		}
+	//
+	//		news = append(news, newsStruct{
+	//			PublicationId: oId,
+	//			Source:        p.Author.Id,
+	//			User:          result.User,
+	//			Order:         p.CreatedOn.UnixMilli(),
+	//		})
+	//	}
+	//
+	//	if len(news) > 0 {
+	//		_, err = storage.news.InsertMany(ctx, news)
+	//		if err != nil {
+	//			return err
+	//		}
+	//	}
+	//
+	//	if err := cur.Err(); err != nil {
+	//		return err
+	//	}
+	//
+	//	cur.Close(ctx)
+	//}
+
+	return err
+}
+
 func (storage *MongoNewsStorage) UpdatePublication(ctx context.Context, publication *Publication) error {
 	f := bson.D{{"_id", publication.Id}}
 	d := bson.D{
@@ -179,14 +267,12 @@ func (storage *MongoNewsStorage) UpdatePublication(ctx context.Context, publicat
 }
 
 func (storage *MongoNewsStorage) RemovePublication(ctx context.Context, publication *Publication) error {
-	f := bson.D{{"_id", publication.Id}}
-	_, err := storage.publications.DeleteOne(ctx, f)
+	_, err := storage.publications.DeleteOne(ctx, bson.D{{"_id", publication.Id}})
 	if err != nil {
 		return err
 	}
 
-	f = bson.D{{"publicationId", publication.Id}}
-	_, err = storage.news.DeleteMany(ctx, f)
+	_, err = storage.news.DeleteMany(ctx, bson.D{{"publicationId", publication.Id}})
 
 	return err
 }
