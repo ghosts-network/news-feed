@@ -5,11 +5,14 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/Azure/azure-sdk-for-go/sdk/messaging/azservicebus"
+	"github.com/ghosts-network/news-feed/infrastructure"
 	"github.com/ghosts-network/news-feed/news"
 	"github.com/ghosts-network/news-feed/utils/logger"
 	"github.com/pkg/errors"
+	amqp "github.com/rabbitmq/amqp091-go"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 )
@@ -20,13 +23,19 @@ func main() {
 	logger.ApplicationName = "news-feed-listener"
 
 	storage := news.NewMongoNewsStorage(os.Getenv("MONGO_CONNECTION"))
-	eventbus := configureEventBus(os.Getenv("SERVICEBUS_CONNECTION"))
 
 	ctx := context.Background()
 
-	err := eventbus.ListenOne(ctx, "ghostnetwork.content.publications.created", subscriptionName, func(ctx context.Context, message *azservicebus.ReceivedMessage) error {
+	eventbus, err := getEventBus()
+	if err != nil {
+		logger.Error(err, &map[string]any{})
+		return
+	}
+
+	err = eventbus.ListenOne(ctx, "ghostnetwork.content.publications.created", subscriptionName, func(ctx context.Context, message []byte) error {
 		var model news.Publication
-		err := json.Unmarshal(message.Body, &model)
+		logger.Debug(string(message), &map[string]any{})
+		err := json.Unmarshal(message, &model)
 		if err != nil {
 			return err
 		}
@@ -42,9 +51,9 @@ func main() {
 		logger.Info(fmt.Sprintf("Successfully subscribed to topic ghostnetwork.content.publications.created"), &map[string]any{})
 	}
 
-	err = eventbus.ListenOne(ctx, "ghostnetwork.content.publications.updated", subscriptionName, func(ctx context.Context, message *azservicebus.ReceivedMessage) error {
+	err = eventbus.ListenOne(ctx, "ghostnetwork.content.publications.updated", subscriptionName, func(ctx context.Context, message []byte) error {
 		var model news.Publication
-		err := json.Unmarshal(message.Body, &model)
+		err := json.Unmarshal(message, &model)
 		if err != nil {
 			return err
 		}
@@ -60,9 +69,9 @@ func main() {
 		logger.Info(fmt.Sprintf("Successfully subscribed to topic ghostnetwork.content.publications.updated"), &map[string]any{})
 	}
 
-	err = eventbus.ListenOne(ctx, "ghostnetwork.content.publications.deleted", subscriptionName, func(ctx context.Context, message *azservicebus.ReceivedMessage) error {
+	err = eventbus.ListenOne(ctx, "ghostnetwork.content.publications.deleted", subscriptionName, func(ctx context.Context, message []byte) error {
 		var model news.Publication
-		err := json.Unmarshal(message.Body, &model)
+		err := json.Unmarshal(message, &model)
 		if err != nil {
 			return err
 		}
@@ -77,9 +86,9 @@ func main() {
 		logger.Info(fmt.Sprintf("Successfully subscribed to topic ghostnetwork.content.publications.deleted"), &map[string]any{})
 	}
 
-	err = eventbus.ListenOne(ctx, "ghostnetwork.profiles.friends.requestsent", subscriptionName, func(ctx context.Context, message *azservicebus.ReceivedMessage) error {
+	err = eventbus.ListenOne(ctx, "ghostnetwork.profiles.friends.requestsent", subscriptionName, func(ctx context.Context, message []byte) error {
 		var model RequestSent
-		err := json.Unmarshal(message.Body, &model)
+		err := json.Unmarshal(message, &model)
 		if err != nil {
 			return err
 		}
@@ -95,9 +104,9 @@ func main() {
 		logger.Info(fmt.Sprintf("Successfully subscribed to topic ghostnetwork.profiles.friends.requestsent"), &map[string]any{})
 	}
 
-	err = eventbus.ListenOne(ctx, "ghostnetwork.profiles.friends.requestcancelled", subscriptionName, func(ctx context.Context, message *azservicebus.ReceivedMessage) error {
+	err = eventbus.ListenOne(ctx, "ghostnetwork.profiles.friends.requestcancelled", subscriptionName, func(ctx context.Context, message []byte) error {
 		var model RequestCancelled
-		err := json.Unmarshal(message.Body, &model)
+		err := json.Unmarshal(message, &model)
 		if err != nil {
 			return err
 		}
@@ -113,9 +122,9 @@ func main() {
 		logger.Info(fmt.Sprintf("Successfully subscribed to topic ghostnetwork.profiles.friends.requestcancelled"), &map[string]any{})
 	}
 
-	err = eventbus.ListenOne(ctx, "ghostnetwork.profiles.friends.requestapproved", subscriptionName, func(ctx context.Context, message *azservicebus.ReceivedMessage) error {
+	err = eventbus.ListenOne(ctx, "ghostnetwork.profiles.friends.requestapproved", subscriptionName, func(ctx context.Context, message []byte) error {
 		var model RequestApproved
-		err := json.Unmarshal(message.Body, &model)
+		err := json.Unmarshal(message, &model)
 		if err != nil {
 			return err
 		}
@@ -131,9 +140,9 @@ func main() {
 		logger.Info(fmt.Sprintf("Successfully subscribed to topic ghostnetwork.profiles.friends.requestapproved"), &map[string]any{})
 	}
 
-	err = eventbus.ListenOne(ctx, "ghostnetwork.profiles.friends.deleted", subscriptionName, func(ctx context.Context, message *azservicebus.ReceivedMessage) error {
+	err = eventbus.ListenOne(ctx, "ghostnetwork.profiles.friends.deleted", subscriptionName, func(ctx context.Context, message []byte) error {
 		var model Deleted
-		err := json.Unmarshal(message.Body, &model)
+		err := json.Unmarshal(message, &model)
 		if err != nil {
 			return err
 		}
@@ -158,7 +167,35 @@ func main() {
 	<-sigc
 }
 
-func configureEventBus(connectionString string) *EventBus {
-	client, _ := azservicebus.NewClientFromConnectionString(connectionString, nil)
-	return NewEventBus(client)
+func getEventBus() (EventListener, error) {
+	if strings.ToLower(os.Getenv("EVENTHUB_TYPE")) == "servicebus" {
+		eventbus, err := configureServiceBus(os.Getenv("SERVICEBUS_CONNECTION"))
+		return eventbus, err
+	} else if strings.ToLower(os.Getenv("EVENTHUB_TYPE")) == "rabbit" {
+		eventbus, err := configureRabbit(os.Getenv("RABBIT_CONNECTION"))
+		return eventbus, err
+	} else {
+		return &NullEventListener{}, nil
+	}
+}
+
+func configureServiceBus(connectionString string) (*infrastructure.ServiceBus, error) {
+	client, err := azservicebus.NewClientFromConnectionString(connectionString, nil)
+	return infrastructure.NewServiceBus(client), err
+}
+
+func configureRabbit(connectionString string) (*infrastructure.RabbitMq, error) {
+	conn, err := amqp.Dial(connectionString)
+	return infrastructure.NewRabbitMq(conn), err
+}
+
+type EventListener interface {
+	ListenOne(ctx context.Context, topicName string, subscriptionName string, handler func(context.Context, []byte) error) error
+}
+
+type NullEventListener struct {
+}
+
+func (n NullEventListener) ListenOne(ctx context.Context, topicName string, subscriptionName string, handler func(context.Context, []byte) error) error {
+	return nil
 }

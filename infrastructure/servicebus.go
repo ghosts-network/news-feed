@@ -1,4 +1,4 @@
-package main
+package infrastructure
 
 import (
 	"context"
@@ -9,15 +9,15 @@ import (
 	"time"
 )
 
-type EventBus struct {
+type ServiceBus struct {
 	client *azservicebus.Client
 }
 
-func NewEventBus(client *azservicebus.Client) *EventBus {
-	return &EventBus{client: client}
+func NewServiceBus(client *azservicebus.Client) *ServiceBus {
+	return &ServiceBus{client: client}
 }
 
-func (eb EventBus) ListenOne(ctx context.Context, topicName string, subscriptionName string, handler func(context.Context, *azservicebus.ReceivedMessage) error) error {
+func (eb ServiceBus) ListenOne(ctx context.Context, topicName string, subscriptionName string, handler func(context.Context, []byte) error) error {
 	receiver, err := eb.client.NewReceiverForSubscription(topicName, subscriptionName, nil)
 	if err != nil {
 		return err
@@ -36,7 +36,7 @@ func (eb EventBus) ListenOne(ctx context.Context, topicName string, subscription
 				}
 
 				logger.Info(fmt.Sprintf("Message %s processing started", message.MessageID), &scope)
-				err := handler(context.WithValue(context.Background(), "operationId", message.CorrelationID), message)
+				err := handler(context.WithValue(context.Background(), "operationId", message.CorrelationID), message.Body)
 				scope["elapsedMilliseconds"] = time.Now().Sub(st).Milliseconds()
 
 				if err != nil {
