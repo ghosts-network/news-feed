@@ -26,17 +26,20 @@ func NewMongoNewsStorage(connectionString string) *MongoNewsStorage {
 			Started: func(ctx context.Context, event *event.CommandStartedEvent) {
 				logger.Info("Mongodb query started", &map[string]any{
 					"operationId": ctx.Value("operationId"),
+					"type":        "outgoing:mongodb",
 				})
 			},
 			Succeeded: func(ctx context.Context, event *event.CommandSucceededEvent) {
 				logger.Info("Mongodb query finished", &map[string]any{
 					"operationId":         ctx.Value("operationId"),
+					"type":                "outgoing:mongodb",
 					"elapsedMilliseconds": event.DurationNanos / 1000000,
 				})
 			},
 			Failed: func(ctx context.Context, event *event.CommandFailedEvent) {
 				logger.Info("Mongodb query failed", &map[string]any{
 					"operationId":         ctx.Value("operationId"),
+					"type":                "outgoing:mongodb",
 					"elapsedMilliseconds": event.DurationNanos / 1000000,
 				})
 			},

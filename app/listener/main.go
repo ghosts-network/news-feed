@@ -10,6 +10,7 @@ import (
 	"github.com/ghosts-network/news-feed/utils/logger"
 	"github.com/pkg/errors"
 	amqp "github.com/rabbitmq/amqp091-go"
+	"log"
 	"os"
 	"os/signal"
 	"strings"
@@ -20,7 +21,7 @@ import (
 const subscriptionName string = "ghostnetwork.newsfeed"
 
 func main() {
-	logger.ApplicationName = "news-feed-listener"
+	log.SetFlags(0)
 
 	storage := news.NewMongoNewsStorage(os.Getenv("MONGO_CONNECTION"))
 

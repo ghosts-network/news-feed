@@ -11,6 +11,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/gorilla/mux"
 	"github.com/pkg/errors"
+	"log"
 	"net/http"
 	"os"
 	"strconv"
@@ -18,7 +19,7 @@ import (
 )
 
 func main() {
-	logger.ApplicationName = "news-feed-api"
+	log.SetFlags(0)
 
 	newsStorage := news.NewMongoNewsStorage(os.Getenv("MONGO_CONNECTION"))
 
@@ -107,6 +108,7 @@ func loggingMiddleware(next http.Handler) http.Handler {
 
 		logger.Info(fmt.Sprintf("%s %s request started", r.Method, r.RequestURI), &map[string]any{
 			"operationId": r.Context().Value("operationId"),
+			"type":        "incoming:http",
 		})
 
 		sw := NewStatusWriter(w)
@@ -114,6 +116,7 @@ func loggingMiddleware(next http.Handler) http.Handler {
 
 		logger.Info(fmt.Sprintf("%s %s request finished", r.Method, r.RequestURI), &map[string]any{
 			"operationId":         r.Context().Value("operationId"),
+			"type":                "incoming:http",
 			"statusCode":          sw.Status,
 			"elapsedMilliseconds": time.Now().Sub(st).Milliseconds(),
 		})
