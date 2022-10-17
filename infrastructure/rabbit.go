@@ -48,14 +48,14 @@ func (r RabbitMq) ListenOne(ctx context.Context, topicName string, subscriptionN
 			st := time.Now()
 
 			scope := map[string]any{
-				"operationId": message.CorrelationId,
-				"type":        "outgoing:rabbitmq",
-				"messageId":   message.MessageId,
-				"topic":       topicName,
+				"correlationId": message.CorrelationId,
+				"type":          "outgoing:rabbitmq",
+				"messageId":     message.MessageId,
+				"topic":         topicName,
 			}
 
 			logger.Info(fmt.Sprintf("Message %s processing started", message.MessageId), &scope)
-			err := handler(context.WithValue(context.Background(), "operationId", message.CorrelationId), message.Body)
+			err := handler(context.WithValue(context.Background(), "correlationId", message.CorrelationId), message.Body)
 			scope["elapsedMilliseconds"] = time.Now().Sub(st).Milliseconds()
 
 			if err != nil {

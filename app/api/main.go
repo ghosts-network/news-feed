@@ -35,7 +35,7 @@ func main() {
 		ps, err := newsStorage.FindNews(r.Context(), user, cursor, take)
 		if err != nil {
 			logger.Error(errors.Wrap(err, fmt.Sprintf("Failed to fetch news")), &map[string]any{
-				"operationId": r.Context().Value("operationId"),
+				"correlationId": r.Context().Value("correlationId"),
 			})
 			w.WriteHeader(http.StatusInternalServerError)
 			_, _ = w.Write([]byte(err.Error()))
@@ -45,7 +45,7 @@ func main() {
 		body, err := json.Marshal(ps)
 		if err != nil {
 			logger.Error(errors.Wrap(err, fmt.Sprintf("Failed to marshal news")), &map[string]any{
-				"operationId": r.Context().Value("operationId"),
+				"correlationId": r.Context().Value("correlationId"),
 			})
 			w.WriteHeader(http.StatusInternalServerError)
 			_, _ = w.Write([]byte(err.Error()))
@@ -97,7 +97,7 @@ func scopedLoggerMiddleware(next http.Handler) http.Handler {
 			id = uuid.NewString()
 		}
 
-		newContext := context.WithValue(r.Context(), "operationId", id)
+		newContext := context.WithValue(r.Context(), "correlationId", id)
 		next.ServeHTTP(w, r.WithContext(newContext))
 	})
 }
@@ -107,15 +107,15 @@ func loggingMiddleware(next http.Handler) http.Handler {
 		st := time.Now()
 
 		logger.Info(fmt.Sprintf("%s %s request started", r.Method, r.RequestURI), &map[string]any{
-			"operationId": r.Context().Value("operationId"),
-			"type":        "incoming:http",
+			"correlationId": r.Context().Value("correlationId"),
+			"type":          "incoming:http",
 		})
 
 		sw := NewStatusWriter(w)
 		next.ServeHTTP(sw, r)
 
 		logger.Info(fmt.Sprintf("%s %s request finished", r.Method, r.RequestURI), &map[string]any{
-			"operationId":         r.Context().Value("operationId"),
+			"correlationId":       r.Context().Value("correlationId"),
 			"type":                "incoming:http",
 			"statusCode":          sw.Status,
 			"elapsedMilliseconds": time.Now().Sub(st).Milliseconds(),

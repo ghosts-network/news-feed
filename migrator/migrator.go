@@ -32,7 +32,7 @@ func (m Migrator) MigrateUsers(ctx context.Context) {
 		ps, err := m.pc.GetProfiles(ctx, skip, take)
 		if err != nil {
 			logger.Error(err, &map[string]any{
-				"operationId": ctx.Value("operationId"),
+				"correlationId": ctx.Value("correlationId"),
 			})
 			return
 		}
@@ -56,7 +56,7 @@ func (m Migrator) MigrateUsers(ctx context.Context) {
 	}
 
 	logger.Info("Users migration finished", &map[string]any{
-		"operationId":         ctx.Value("operationId"),
+		"correlationId":       ctx.Value("correlationId"),
 		"elapsedMilliseconds": time.Now().Sub(st).Milliseconds(),
 	})
 }
@@ -69,7 +69,7 @@ func (m Migrator) MigrateUser(ctx context.Context, user string) {
 	m.migrateOutgoingRequests(ctx, user)
 
 	logger.Info(fmt.Sprintf("User %s migration finished", user), &map[string]any{
-		"operationId":         ctx.Value("operationId"),
+		"correlationId":       ctx.Value("correlationId"),
 		"elapsedMilliseconds": time.Now().Sub(st).Milliseconds(),
 	})
 }
@@ -81,7 +81,7 @@ func (m Migrator) MigrateUserAsync(ctx context.Context, user string, wg *sync.Wa
 	wg.Done()
 
 	logger.Debug(fmt.Sprintf("User %s migration finished", user), &map[string]any{
-		"operationId": ctx.Value("operationId"),
+		"correlationId": ctx.Value("correlationId"),
 	})
 }
 
@@ -96,7 +96,7 @@ func (m Migrator) MigratePublications(ctx context.Context) {
 		ps, nextCursor, err := m.pubsClient.GetPublications(ctx, cursor, take)
 		if err != nil {
 			logger.Error(errors.Wrap(err, fmt.Sprintf("Failed to fetch publications with cursor: %s, count: %d", cursor, take)), &map[string]any{
-				"operationId": ctx.Value("operationId"),
+				"correlationId": ctx.Value("correlationId"),
 			})
 			return
 		}
@@ -107,11 +107,11 @@ func (m Migrator) MigratePublications(ctx context.Context) {
 
 		if err = m.ns.AddPublications(ctx, ps); err != nil {
 			logger.Error(errors.Wrap(err, fmt.Sprintf("Failed to migrate publications batch (%s, %d)", cursor, take)), &map[string]any{
-				"operationId": ctx.Value("operationId"),
+				"correlationId": ctx.Value("correlationId"),
 			})
 		} else {
 			logger.Debug(fmt.Sprintf("Publications batch (%s, %d) migrated", cursor, take), &map[string]any{
-				"operationId": ctx.Value("operationId"),
+				"correlationId": ctx.Value("correlationId"),
 			})
 		}
 
@@ -123,7 +123,7 @@ func (m Migrator) MigratePublications(ctx context.Context) {
 	}
 
 	logger.Info("Publications migration finished", &map[string]any{
-		"operationId":         ctx.Value("operationId"),
+		"correlationId":       ctx.Value("correlationId"),
 		"elapsedMilliseconds": time.Now().Sub(st).Milliseconds(),
 	})
 }
@@ -136,7 +136,7 @@ func (m Migrator) migrateFriends(ctx context.Context, user string) {
 		friends, err := m.rc.GetFriends(ctx, user, skip, take)
 		if err != nil {
 			logger.Error(errors.Wrap(err, fmt.Sprintf("Failed to fetch friends for %s with skip: %d, count: %d", user, skip, take)), &map[string]any{
-				"operationId": ctx.Value("operationId"),
+				"correlationId": ctx.Value("correlationId"),
 			})
 			return
 		}
@@ -147,11 +147,11 @@ func (m Migrator) migrateFriends(ctx context.Context, user string) {
 
 		if err = m.ns.AddUserSources(ctx, user, friends); err != nil {
 			logger.Error(errors.Wrap(err, fmt.Sprintf("Failed to migrate friends batch (%d, %d) for %s", skip, take, user)), &map[string]any{
-				"operationId": ctx.Value("operationId"),
+				"correlationId": ctx.Value("correlationId"),
 			})
 		} else {
 			logger.Debug(fmt.Sprintf("Friends batch (%d, %d) for %s migrated", skip, take, user), &map[string]any{
-				"operationId": ctx.Value("operationId"),
+				"correlationId": ctx.Value("correlationId"),
 			})
 		}
 
@@ -170,7 +170,7 @@ func (m Migrator) migrateOutgoingRequests(ctx context.Context, user string) {
 		rs, err := m.rc.GetOutgoingRequests(ctx, user, skip, take)
 		if err != nil {
 			logger.Error(errors.Wrap(err, fmt.Sprintf("Failed to fetch outgoing requests for %s with skip: %d, count: %d", user, skip, take)), &map[string]any{
-				"operationId": ctx.Value("operationId"),
+				"correlationId": ctx.Value("correlationId"),
 			})
 			return
 		}
@@ -181,11 +181,11 @@ func (m Migrator) migrateOutgoingRequests(ctx context.Context, user string) {
 
 		if err = m.ns.AddUserSources(ctx, user, rs); err != nil {
 			logger.Error(errors.Wrap(err, fmt.Sprintf("Failed to migrate outgoing requests batch (%d, %d) for %s", skip, take, user)), &map[string]any{
-				"operationId": ctx.Value("operationId"),
+				"correlationId": ctx.Value("correlationId"),
 			})
 		} else {
 			logger.Debug(fmt.Sprintf("Outgoing request batch (%d, %d) for %s migrated", skip, take, user), &map[string]any{
-				"operationId": ctx.Value("operationId"),
+				"correlationId": ctx.Value("correlationId"),
 			})
 		}
 

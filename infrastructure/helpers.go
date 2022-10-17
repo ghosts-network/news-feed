@@ -18,13 +18,13 @@ type LogRoundTripper struct{}
 func (t LogRoundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
 	st := time.Now()
 	logger.Info(fmt.Sprintf("Outgoing http request started %s %s", req.Method, req.URL.String()), &map[string]any{
-		"operationId": req.Context().Value("operationId"),
-		"type":        "outgoing:http",
+		"correlationId": req.Context().Value("correlationId"),
+		"type":          "outgoing:http",
 	})
 
 	resp, err := http.DefaultTransport.RoundTrip(req)
 	logger.Info(fmt.Sprintf("Outgoing http request finished %s %s", req.Method, req.URL.String()), &map[string]any{
-		"operationId":         req.Context().Value("operationId"),
+		"correlationId":       req.Context().Value("correlationId"),
 		"type":                "outgoing:http",
 		"elapsedMilliseconds": time.Now().Sub(st).Milliseconds(),
 		"statusCode":          resp.StatusCode,

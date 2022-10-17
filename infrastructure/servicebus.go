@@ -30,14 +30,14 @@ func (eb ServiceBus) ListenOne(ctx context.Context, topicName string, subscripti
 				st := time.Now()
 
 				scope := map[string]any{
-					"operationId": message.CorrelationID,
-					"type":        "outgoing:servicebus",
-					"messageId":   message.MessageID,
-					"topic":       topicName,
+					"correlationId": message.CorrelationID,
+					"type":          "outgoing:servicebus",
+					"messageId":     message.MessageID,
+					"topic":         topicName,
 				}
 
 				logger.Info(fmt.Sprintf("Message %s processing started", message.MessageID), &scope)
-				err := handler(context.WithValue(context.Background(), "operationId", message.CorrelationID), message.Body)
+				err := handler(context.WithValue(context.Background(), "correlationId", message.CorrelationID), message.Body)
 				scope["elapsedMilliseconds"] = time.Now().Sub(st).Milliseconds()
 
 				if err != nil {
