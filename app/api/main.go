@@ -96,6 +96,7 @@ func scopedLoggerMiddleware(next http.Handler) http.Handler {
 		if id == "" {
 			id = uuid.NewString()
 		}
+		w.Header().Set("X-Request-ID", id)
 
 		newContext := context.WithValue(r.Context(), "correlationId", id)
 		next.ServeHTTP(w, r.WithContext(newContext))
