@@ -10,7 +10,7 @@ import (
 func NewScopedClient() *http.Client {
 	return &http.Client{
 		Transport: &LogRoundTripper{
-			SetRequestIdRoundTripper{
+			SetRequestHeadersRoundTripper{
 				http.DefaultTransport,
 			},
 		},
@@ -39,12 +39,13 @@ func (t LogRoundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
 	return resp, err
 }
 
-type SetRequestIdRoundTripper struct {
+type SetRequestHeadersRoundTripper struct {
 	Proxied http.RoundTripper
 }
 
-func (t SetRequestIdRoundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
+func (t SetRequestHeadersRoundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
 	req.Header.Set("X-Request-ID", req.Context().Value("correlationId").(string))
+	req.Header.Set("X-Called-ID", "NewsFeed")
 	resp, err := t.Proxied.RoundTrip(req)
 
 	return resp, err
