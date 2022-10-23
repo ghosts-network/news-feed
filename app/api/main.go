@@ -118,6 +118,7 @@ func loggingMiddleware(next http.Handler) http.Handler {
 
 		logger.Info(fmt.Sprintf("%s %s request finished", r.Method, r.RequestURI), &map[string]any{
 			"correlationId":       r.Context().Value("correlationId"),
+			"calledId":            r.Header.Get("X-Called-ID"),
 			"type":                "incoming:http",
 			"statusCode":          sw.Status,
 			"elapsedMilliseconds": time.Now().Sub(st).Milliseconds(),
