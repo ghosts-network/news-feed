@@ -45,7 +45,7 @@ type SetRequestHeadersRoundTripper struct {
 
 func (t SetRequestHeadersRoundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
 	req.Header.Set("X-Request-ID", req.Context().Value("correlationId").(string))
-	req.Header.Set("X-Called-ID", "NewsFeed")
+	req.Header.Set("X-Caller-ID", "NewsFeed")
 	resp, err := t.Proxied.RoundTrip(req)
 
 	return resp, err
