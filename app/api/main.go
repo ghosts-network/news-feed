@@ -28,7 +28,7 @@ func main() {
 		user := mux.Vars(r)["user"]
 		cursor := r.URL.Query().Get("cursor")
 		take, _ := strconv.Atoi(r.URL.Query().Get("take"))
-		if 0 < take || take > 100 {
+		if 0 >= take || take > 100 {
 			take = 20
 		}
 
@@ -63,7 +63,7 @@ func main() {
 		getMigrator().
 			MigrateUsers(r.Context())
 
-		w.WriteHeader(http.StatusAccepted)
+		w.WriteHeader(http.StatusOK)
 	}).Methods(http.MethodPost)
 
 	r.HandleFunc("/migrator/users/{user}", func(w http.ResponseWriter, r *http.Request) {

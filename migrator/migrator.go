@@ -65,6 +65,7 @@ func (m Migrator) MigrateUser(ctx context.Context, user string) {
 	st := time.Now()
 
 	_ = m.ns.RemoveUserSources(ctx, user)
+	_ = m.ns.RemoveNews(ctx, user)
 	m.migrateFriends(ctx, user)
 	m.migrateOutgoingRequests(ctx, user)
 
@@ -76,8 +77,11 @@ func (m Migrator) MigrateUser(ctx context.Context, user string) {
 
 func (m Migrator) MigrateUserAsync(ctx context.Context, user string, wg *sync.WaitGroup) {
 	_ = m.ns.RemoveUserSources(ctx, user)
+	_ = m.ns.RemoveNews(ctx, user)
+
 	m.migrateFriends(ctx, user)
 	m.migrateOutgoingRequests(ctx, user)
+
 	wg.Done()
 
 	logger.Debug(fmt.Sprintf("User %s migration finished", user), &map[string]any{

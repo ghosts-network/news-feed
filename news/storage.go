@@ -131,6 +131,11 @@ func (storage *MongoNewsStorage) RemoveUserSource(ctx context.Context, user stri
 	return err
 }
 
+func (storage *MongoNewsStorage) RemoveNews(ctx context.Context, user string) error {
+	_, err := storage.news.DeleteMany(ctx, bson.D{{"user", user}})
+	return err
+}
+
 func (storage *MongoNewsStorage) RemovePublications(ctx context.Context) error {
 	_, err := storage.publications.DeleteMany(ctx, bson.D{})
 	return err
