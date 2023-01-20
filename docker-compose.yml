@@ -1,0 +1,33 @@
+version: "3"
+
+services:
+
+  mongo:
+    container_name: ghost-network-mongo
+    image: mongo:5.0.8
+    ports:
+      - "27017:27017"
+
+  rabbit:
+    container_name: ghost-network-rabbit
+    image: rabbitmq:3.9.8-management-alpine
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    environment:
+      - RABBITMQ_DEFAULT_USER=root
+      - RABBITMQ_DEFAULT_PASS=sDAM4xyhwCpDAEXy8r4v
+
+  api:
+    build: .
+    ports:
+      - "5300:80"
+    command: "--server.enable --listener.enable"
+    depends_on:
+      - mongo
+      - rabbit
+    environment:
+      - MONGO_CONNECTION=mongodb://mongo:27017/gpublications
+      - ASPNETCORE_ENVIRONMENT=Development
+      - REACTION_STORAGE_TYPE=redis
+      - REDIS_CONNECTION=redis

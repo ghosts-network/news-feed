@@ -2,13 +2,9 @@ FROM golang:1.19-alpine
 
 WORKDIR /app
 
-COPY go.mod ./
-COPY go.sum ./
-RUN go mod download
-
 COPY . .
-RUN go build -o /news-feed ./app/api
+RUN go build -o /news-feed .
 
-EXPOSE 10000
+EXPOSE 80
 
-CMD ["/news-feed"]
+ENTRYPOINT ["/news-feed"]
