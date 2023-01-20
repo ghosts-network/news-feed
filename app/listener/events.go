@@ -1,4 +1,4 @@
-package main
+package listener
 
 type RequestSent struct {
 	FromUser string
