@@ -31,7 +31,7 @@ func (eb ServiceBus) ListenOne(ctx context.Context, topicName string, subscripti
 
 				scope := map[string]any{
 					"correlationId": message.CorrelationID,
-					"type":          "outgoing:servicebus",
+					"type":          "incoming:servicebus",
 					"messageId":     message.MessageID,
 					"topic":         topicName,
 				}

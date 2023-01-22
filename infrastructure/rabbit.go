@@ -49,7 +49,7 @@ func (r RabbitMq) ListenOne(ctx context.Context, topicName string, subscriptionN
 
 			scope := map[string]any{
 				"correlationId": message.CorrelationId,
-				"type":          "outgoing:rabbitmq",
+				"type":          "incoming:rabbitmq",
 				"messageId":     message.MessageId,
 				"topic":         topicName,
 			}
