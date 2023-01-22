@@ -19,6 +19,7 @@ services:
       - RABBITMQ_DEFAULT_PASS=sDAM4xyhwCpDAEXy8r4v
 
   api:
+    container_name: ghost-network-news-feed
     build: .
     ports:
       - "5300:80"
@@ -29,5 +30,5 @@ services:
     environment:
       - MONGO_CONNECTION=mongodb://mongo:27017/gpublications
       - ASPNETCORE_ENVIRONMENT=Development
-      - REACTION_STORAGE_TYPE=redis
-      - REDIS_CONNECTION=redis
+      - EVENTHUB_TYPE=rabbit
+      - RABBIT_CONNECTION=amqp://root:sDAM4xyhwCpDAEXy8r4v@rabbit:5672/
