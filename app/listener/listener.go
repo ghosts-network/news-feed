@@ -41,7 +41,6 @@ func (l Listener) Run() {
 
 	err = eventbus.ListenOne(ctx, "ghostnetwork.content.publications.created", subscriptionName, func(ctx context.Context, message []byte) error {
 		var model news.Publication
-		logger.Debug(string(message), &map[string]any{})
 		err := json.Unmarshal(message, &model)
 		if err != nil {
 			return err
